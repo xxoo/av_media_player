@@ -3,29 +3,57 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'types.dart';
 
+/// The class to crate and control [AVMediaPlayer] instance
+///
+/// Do NOT modify properties directly, use the corresponding methods instead
 class AVMediaPlayer {
   static const _methodChannel = MethodChannel('avMediaPlayer');
 
+  /// The id of the player, it's unique. It's null before the player is initialized.
+  /// It will never change after the player is initialized.
   final id = ValueNotifier<int?>(null);
+
+  /// The info of the current media. It's null before the media is opened
   final mediaInfo = ValueNotifier<MediaInfo?>(null);
+
+  /// The position of the player in milliseconds
   final position = ValueNotifier(0);
+
+  /// The error message of the player. It's null before an error occurs
   final error = ValueNotifier<String?>(null);
+
+  /// The loading state of the player
   final loading = ValueNotifier(false);
+
+  /// The playback state of the player
   final playbackState = ValueNotifier(PlaybackState.closed);
+
+  /// The volume of the player. It's between 0 and 1, and has a default value of 1
   final volume = ValueNotifier(1.0);
+
+  /// The speed of the player. It's between 0.5 and 2, and has a default value of 1
   final speed = ValueNotifier(1.0);
+
+  /// Whether the player should loop the media. It's false by default
   final looping = ValueNotifier(false);
+
+  /// Whether the player should play the media automatically. It's false by default
   final autoPlay = ValueNotifier(false);
+
+  /// The times the player has finished playing the current media
   final finishedTimes = ValueNotifier(0);
+
+  /// The current buffer status of the player. It is only reported for network media
   final bufferRange = ValueNotifier(BufferRange.empty);
 
-  // event channel is much more efficient than method channel
-  // we'd better use it to hanel playback events especially for position
+  // Event channel is much more efficient than method channel
+  // We'd better use it to hanel playback events especially for position
   StreamSubscription? _eventSubscription;
-
   String? _source;
   int? _position;
 
+  /// All the parameters are optional, they take efferts when the player is created.
+  /// And can be changed later by calling the corresponding methods
   AVMediaPlayer({
     String? initSource,
     double? initVolume,
@@ -130,6 +158,7 @@ class AVMediaPlayer {
     }
   }
 
+  /// Dispose the player
   void dispose() {
     _methodChannel.invokeMethod('dispose', id.value);
     _eventSubscription?.cancel();
@@ -146,9 +175,11 @@ class AVMediaPlayer {
     finishedTimes.dispose();
   }
 
+  /// Open a media file
+  ///
+  /// source: The url or local path of the media file
   void open(String source) {
     _source = source;
-    loading.value = true;
     if (id.value != null) {
       error.value = null;
       mediaInfo.value = null;
@@ -158,8 +189,10 @@ class AVMediaPlayer {
       playbackState.value = PlaybackState.closed;
       _methodChannel.invokeMethod('open', {'id': id.value, 'value': source});
     }
+    loading.value = true;
   }
 
+  /// Close the media file, or stop opening the media file
   void close() {
     _source = null;
     if (id.value != null &&
@@ -174,6 +207,9 @@ class AVMediaPlayer {
     loading.value = false;
   }
 
+  /// Play the current media file
+  ///
+  /// If the the player is opening a media file, calling this method will set autoplay to true
   bool play() {
     if (speed.value > 0) {
       if (id.value != null && playbackState.value == PlaybackState.paused) {
@@ -190,6 +226,7 @@ class AVMediaPlayer {
     return false;
   }
 
+  /// Pause the current media file
   bool pause() {
     if (id.value != null && playbackState.value == PlaybackState.playing) {
       _methodChannel.invokeMethod('pause', id.value);
@@ -205,47 +242,61 @@ class AVMediaPlayer {
     return false;
   }
 
-  bool seekTo(int pos) {
+  /// Seek to a specific position
+  ///
+  /// position: The position to seek to in milliseconds
+  bool seekTo(int position) {
     if (id.value != null &&
         mediaInfo.value != null &&
-        pos >= 0 &&
-        pos <= mediaInfo.value!.duration) {
-      _methodChannel.invokeMethod('seekTo', {'id': id.value, 'value': pos});
+        position >= 0 &&
+        position <= mediaInfo.value!.duration) {
+      _methodChannel
+          .invokeMethod('seekTo', {'id': id.value, 'value': position});
       loading.value = true;
       return true;
     }
     return false;
   }
 
-  bool setVolume(double vol) {
-    if (volume.value != vol && vol >= 0 && vol <= 1) {
-      _methodChannel.invokeMethod('setVolume', {'id': id.value, 'value': vol});
-      volume.value = vol;
+  /// Set the volume of the player
+  ///
+  /// volume: The volume to set between 0 and 1
+  bool setVolume(double volume) {
+    if (this.volume.value != volume && volume >= 0 && volume <= 1) {
+      _methodChannel
+          .invokeMethod('setVolume', {'id': id.value, 'value': volume});
+      this.volume.value = volume;
       return true;
     }
     return false;
   }
 
-  bool setSpeed(double spd) {
-    if (spd >= 0.5 && spd <= 2) {
+  /// Set the speed of the player
+  ///
+  /// speed: The speed to set between 0.5 and 2
+  bool setSpeed(double speed) {
+    if (speed >= 0.5 && speed <= 2) {
       if (id.value != null) {
-        _methodChannel.invokeMethod('setSpeed', {'id': id.value, 'value': spd});
+        _methodChannel
+            .invokeMethod('setSpeed', {'id': id.value, 'value': speed});
       }
-      speed.value = spd;
+      this.speed.value = speed;
       return true;
     }
     return false;
   }
 
-  void setLooping(bool loop) {
+  /// Set whether the player should loop the media
+  void setLooping(bool looping) {
     if (id.value != null) {
       _methodChannel
-          .invokeMethod('setLooping', {'id': id.value, 'value': loop});
+          .invokeMethod('setLooping', {'id': id.value, 'value': looping});
     }
-    looping.value = loop;
+    this.looping.value = looping;
   }
 
-  void setAutoPlay(bool auto) {
-    autoPlay.value = auto;
+  /// Set whether the player should play the media automatically
+  void setAutoPlay(bool autoPlay) {
+    this.autoPlay.value = autoPlay;
   }
 }

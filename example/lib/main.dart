@@ -1,90 +1,48 @@
-import 'dart:core';
-
 import 'package:flutter/material.dart';
-import 'video_list_view.dart';
-import 'video_player_view.dart';
-import 'defines.dart';
+import 'package:av_media_player/index.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  for (final n in videoSources) {
-    if (n.type == VideoSourceType.asset) {
-      n.path = await loadAssetFile(n.path);
-      n.type = VideoSourceType.local;
-    }
-  }
-  runApp(
-    const AppView(),
-  );
-}
+void main() => runApp(const MyApp());
 
-enum AppRoute {
-  videoPlayer,
-  videoList,
-}
-
-class AppView extends StatefulWidget {
-  const AppView({super.key});
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
 
   @override
-  State<AppView> createState() => _AppViewState();
+  State<MyApp> createState() => _MyAppState();
 }
 
-class _AppViewState extends State<AppView> {
-  var _appRoute = AppRoute.videoPlayer;
+class _MyAppState extends State<MyApp> {
+  AVMediaPlayer? _player;
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Lite Video Player example app'),
+  Widget build(BuildContext context) => MaterialApp(
+        home: Scaffold(
+          appBar: AppBar(
+            title: const Text('AV Media Player example app'),
+          ),
+          body: AspectRatio(
+            aspectRatio: _player?.mediaInfo.value == null
+                ? 16 / 9
+                : _player!.mediaInfo.value!.width /
+                    _player!.mediaInfo.value!.height,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                AVMediaView(
+                  initSource:
+                      'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+                  initLooping: true,
+                  initAutoPlay: true,
+                  onCreated: (player) {
+                    _player = player;
+                    player.mediaInfo.addListener(() => setState(() {}));
+                    player.loading.addListener(() => setState(() {}));
+                  },
+                ),
+                if (_player?.loading.value ?? true)
+                  const CircularProgressIndicator(),
+              ],
+            ),
+          ),
         ),
-        body: _buildBodyView(),
-        bottomNavigationBar: BottomNavigationView(
-          selectedAppRoute: _appRoute,
-          onAppRouteSelected: (appRoute) =>
-              setState(() => _appRoute = appRoute),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBodyView() {
-    switch (_appRoute) {
-      case AppRoute.videoPlayer:
-        return const VideoPlayerView();
-      case AppRoute.videoList:
-        return const VideoListView();
-    }
-  }
-}
-
-class BottomNavigationView extends StatelessWidget {
-  final AppRoute selectedAppRoute;
-  final void Function(AppRoute) onAppRouteSelected;
-
-  const BottomNavigationView({
-    super.key,
-    required this.selectedAppRoute,
-    required this.onAppRouteSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      items: const <BottomNavigationBarItem>[
-        BottomNavigationBarItem(
-          icon: Icon(Icons.smart_display),
-          label: 'Video Player',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.view_stream),
-          label: 'Video List',
-        ),
-      ],
-      currentIndex: selectedAppRoute.index,
-      onTap: (index) => onAppRouteSelected(AppRoute.values[index]),
-    );
-  }
+      );
 }

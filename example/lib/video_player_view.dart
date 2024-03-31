@@ -18,14 +18,14 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
   initState() {
     super.initState();
     _player = AVMediaPlayer(initSource: videoSources.first.path);
-    _player.playbackState.addListener(() => _setState(() {}));
-    _player.position.addListener(() => _setState(() {}));
-    _player.speed.addListener(() => _setState(() {}));
-    _player.volume.addListener(() => _setState(() {}));
-    _player.mediaInfo.addListener(() => _setState(() {}));
-    _player.loading.addListener(() => _setState(() {}));
-    _player.looping.addListener(() => _setState(() {}));
-    _player.autoPlay.addListener(() => _setState(() {}));
+    _player.playbackState.addListener(() => setState(() {}));
+    _player.position.addListener(() => setState(() {}));
+    _player.speed.addListener(() => setState(() {}));
+    _player.volume.addListener(() => setState(() {}));
+    _player.mediaInfo.addListener(() => setState(() {}));
+    _player.loading.addListener(() => setState(() {}));
+    _player.looping.addListener(() => setState(() {}));
+    _player.autoPlay.addListener(() => setState(() {}));
     _player.error
         .addListener(() => debugPrint('error: ${_player.error.value}'));
     _player.bufferRange.addListener(() {
@@ -235,11 +235,12 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
 
   //some opreation may trigger the builder while building is in process.
   //in this situation, we just queue a new frame to update the state.
-  void _setState(void Function() fn) {
+  @override
+  void setState(void Function() fn) {
     try {
-      setState(fn);
+      super.setState(fn);
     } catch (e) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(fn));
+      WidgetsBinding.instance.addPostFrameCallback((_) => super.setState(fn));
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'player.dart';
 
+/// The widget to display video for [AVMediaPlayer].
 class AVMediaView extends StatefulWidget {
   final AVMediaPlayer? initPlayer;
   final String? initSource;
@@ -11,6 +12,12 @@ class AVMediaView extends StatefulWidget {
   final int? initPosition;
   final void Function(AVMediaPlayer player)? onCreated;
 
+  /// Create a new [AVMediaView] widget.
+  ///
+  /// If [initPlayer] is null, a new player will be created. You can get the player from [onCreated] callback.
+  ///
+  /// Other parameters are optional. They take efferts when the widget is created.
+  /// And can be changed later by calling the corresponding methods of the player
   const AVMediaView({
     super.key,
     this.initPlayer,
@@ -96,9 +103,12 @@ class _AVMediaState extends State<AVMediaView> {
   }
 
   @override
-  Widget build(BuildContext context) => _player?.id.value == null
-      ? Container()
-      : Texture(textureId: _player!.id.value!);
+  Widget build(BuildContext context) => Container(
+        color: const Color(0xFF000000),
+        child: _player?.id.value == null
+            ? null
+            : Texture(textureId: _player!.id.value!),
+      );
 
   void _initPosition() {
     _player?.mediaInfo.removeListener(_initPosition);

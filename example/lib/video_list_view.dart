@@ -18,8 +18,8 @@ class _VideoListView extends State<VideoListView> {
 
     for (var i = 0; i < videoSources.length; i++) {
       final player = AVMediaPlayer(initLooping: true);
-      player.mediaInfo.addListener(() => _setState(() {}));
-      player.loading.addListener(() => _setState(() {}));
+      player.mediaInfo.addListener(() => setState(() {}));
+      player.loading.addListener(() => setState(() {}));
       _players.add(player);
     }
   }
@@ -94,11 +94,12 @@ class _VideoListView extends State<VideoListView> {
 
   //some opreation may trigger the builder while building is in process.
   //in this situation, we just queue a new frame to update the state.
-  void _setState(void Function() fn) {
+  @override
+  void setState(void Function() fn) {
     try {
-      setState(fn);
+      super.setState(fn);
     } catch (e) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(fn));
+      WidgetsBinding.instance.addPostFrameCallback((_) => super.setState(fn));
     }
   }
 }

@@ -31,8 +31,9 @@ final videoSources = [
     type: VideoSourceType.network,
   ),
   ExampleVideoSource(
-      path: 'https://download.samplelib.com/mp3/sample-3s.mp3',
-      type: VideoSourceType.network),
+    path: 'https://download.samplelib.com/mp3/sample-3s.mp3',
+    type: VideoSourceType.network,
+  ),
 ];
 
 Future<String> loadAssetFile(String assetPath) async {
