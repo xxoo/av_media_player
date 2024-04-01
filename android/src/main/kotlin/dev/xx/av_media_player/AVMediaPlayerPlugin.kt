@@ -188,6 +188,14 @@ class AVMediaPlayer(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.
     }
   }
 
+  fun dispose() {
+    mediaPlayer.release()
+    surface.release()
+    surfaceTextureEntry.release()
+    handler.removeCallbacksAndMessages(null)
+    eventSink?.endOfStream()
+  }
+
   fun open(source: String) {
     close()
     this.source = source
@@ -274,13 +282,5 @@ class AVMediaPlayer(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.
 
   override fun onCancel(arguments: Any?) {
     eventSink = null
-  }
-
-  fun dispose() {
-    mediaPlayer.release()
-    surface.release()
-    surfaceTextureEntry.release()
-    handler.removeCallbacksAndMessages(null)
-    eventSink?.endOfStream()
   }
 }

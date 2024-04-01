@@ -3,47 +3,47 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'types.dart';
 
-/// The class to crate and control [AVMediaPlayer] instance
+/// The class to create and control [AVMediaPlayer] instance.
 ///
-/// Do NOT modify properties directly, use the corresponding methods instead
+/// Do NOT modify properties directly, use the corresponding methods instead.
 class AVMediaPlayer {
   static const _methodChannel = MethodChannel('avMediaPlayer');
 
-  /// The id of the player, it's unique. It's null before the player is initialized.
-  /// It will never change after the player is initialized.
+  /// The id of the player. It's null before the player is initialized.
+  /// After the player is initialized it will be unique and never change again.
   final id = ValueNotifier<int?>(null);
 
-  /// The info of the current media. It's null before the media is opened
+  /// The information of the current media. It's null before the media is opened.
   final mediaInfo = ValueNotifier<MediaInfo?>(null);
 
-  /// The position of the player in milliseconds
+  /// The position of the current media in milliseconds. It's 0 before the media is opened.
   final position = ValueNotifier(0);
 
-  /// The error message of the player. It's null before an error occurs
+  /// The error message of the player. It's null before an error occurs.
   final error = ValueNotifier<String?>(null);
 
-  /// The loading state of the player
+  /// The loading state of the player. It's false before opening a media.
   final loading = ValueNotifier(false);
 
-  /// The playback state of the player
+  /// The playback state of the player. It's [PlaybackState.closed] berore a media is opened.
   final playbackState = ValueNotifier(PlaybackState.closed);
 
-  /// The volume of the player. It's between 0 and 1, and has a default value of 1
+  /// The volume of the player. It's between 0 and 1, and defaults to 1.
   final volume = ValueNotifier(1.0);
 
-  /// The speed of the player. It's between 0.5 and 2, and has a default value of 1
+  /// The speed of the player. It's between 0.5 and 2, and defaults to 1.
   final speed = ValueNotifier(1.0);
 
-  /// Whether the player should loop the media. It's false by default
+  /// Whether the player should loop the media. It's false by default.
   final looping = ValueNotifier(false);
 
-  /// Whether the player should play the media automatically. It's false by default
+  /// Whether the player should play the media automatically. It's false by default.
   final autoPlay = ValueNotifier(false);
 
-  /// The times the player has finished playing the current media
+  /// How many times the player has finished playing the current media. It will be reset to 0 when the media is closed.
   final finishedTimes = ValueNotifier(0);
 
-  /// The current buffer status of the player. It is only reported for network media
+  /// The current buffer status of the player. It is only reported for network media.
   final bufferRange = ValueNotifier(BufferRange.empty);
 
   // Event channel is much more efficient than method channel
@@ -52,8 +52,7 @@ class AVMediaPlayer {
   String? _source;
   int? _position;
 
-  /// All the parameters are optional, they take efferts when the player is created.
-  /// And can be changed later by calling the corresponding methods
+  /// All the parameters are optional, and can be changed later by calling the corresponding methods.
   AVMediaPlayer({
     String? initSource,
     double? initVolume,
@@ -192,7 +191,7 @@ class AVMediaPlayer {
     loading.value = true;
   }
 
-  /// Close the media file, or stop opening the media file
+  /// Close or stop opening the media file.
   void close() {
     _source = null;
     if (id.value != null &&
@@ -207,7 +206,7 @@ class AVMediaPlayer {
     loading.value = false;
   }
 
-  /// Play the current media file
+  /// Play the current media file.
   ///
   /// If the the player is opening a media file, calling this method will set autoplay to true
   bool play() {
@@ -226,7 +225,7 @@ class AVMediaPlayer {
     return false;
   }
 
-  /// Pause the current media file
+  /// Pause the current media file.
   bool pause() {
     if (id.value != null && playbackState.value == PlaybackState.playing) {
       _methodChannel.invokeMethod('pause', id.value);
@@ -242,9 +241,9 @@ class AVMediaPlayer {
     return false;
   }
 
-  /// Seek to a specific position
+  /// Seek to a specific position.
   ///
-  /// position: The position to seek to in milliseconds
+  /// position: The position to seek to in milliseconds.
   bool seekTo(int position) {
     if (id.value != null &&
         mediaInfo.value != null &&
@@ -258,9 +257,9 @@ class AVMediaPlayer {
     return false;
   }
 
-  /// Set the volume of the player
+  /// Set the volume of the player.
   ///
-  /// volume: The volume to set between 0 and 1
+  /// volume: The volume to set between 0 and 1.
   bool setVolume(double volume) {
     if (this.volume.value != volume && volume >= 0 && volume <= 1) {
       _methodChannel
@@ -271,9 +270,9 @@ class AVMediaPlayer {
     return false;
   }
 
-  /// Set the speed of the player
+  /// Set playback speed of the player.
   ///
-  /// speed: The speed to set between 0.5 and 2
+  /// speed: The speed to set between 0.5 and 2.
   bool setSpeed(double speed) {
     if (speed >= 0.5 && speed <= 2) {
       if (id.value != null) {
@@ -286,7 +285,7 @@ class AVMediaPlayer {
     return false;
   }
 
-  /// Set whether the player should loop the media
+  /// Set whether the player should loop the media.
   void setLooping(bool looping) {
     if (id.value != null) {
       _methodChannel
@@ -295,7 +294,7 @@ class AVMediaPlayer {
     this.looping.value = looping;
   }
 
-  /// Set whether the player should play the media automatically
+  /// Set whether the player should play the media automatically.
   void setAutoPlay(bool autoPlay) {
     this.autoPlay.value = autoPlay;
   }

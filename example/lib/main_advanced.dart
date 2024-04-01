@@ -1,5 +1,4 @@
 import 'dart:core';
-
 import 'package:flutter/material.dart';
 import 'video_list_view.dart';
 import 'video_player_view.dart';
@@ -13,9 +12,7 @@ void main() async {
       n.type = VideoSourceType.local;
     }
   }
-  runApp(
-    const AppView(),
-  );
+  runApp(const AppView());
 }
 
 enum AppRoute {
@@ -34,21 +31,29 @@ class _AppViewState extends State<AppView> {
   var _appRoute = AppRoute.videoPlayer;
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('AV Media Player example app'),
+  Widget build(BuildContext context) => MaterialApp(
+        home: Scaffold(
+          appBar: AppBar(
+            title: const Text('AV Media Player example app'),
+          ),
+          body: _buildBodyView(),
+          bottomNavigationBar: BottomNavigationBar(
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: Icon(Icons.smart_display),
+                label: 'Video Player',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.view_stream),
+                label: 'Video List',
+              ),
+            ],
+            currentIndex: _appRoute.index,
+            onTap: (index) =>
+                setState(() => _appRoute = AppRoute.values[index]),
+          ),
         ),
-        body: _buildBodyView(),
-        bottomNavigationBar: BottomNavigationView(
-          selectedAppRoute: _appRoute,
-          onAppRouteSelected: (appRoute) =>
-              setState(() => _appRoute = appRoute),
-        ),
-      ),
-    );
-  }
+      );
 
   Widget _buildBodyView() {
     switch (_appRoute) {
@@ -57,34 +62,5 @@ class _AppViewState extends State<AppView> {
       case AppRoute.videoList:
         return const VideoListView();
     }
-  }
-}
-
-class BottomNavigationView extends StatelessWidget {
-  final AppRoute selectedAppRoute;
-  final void Function(AppRoute) onAppRouteSelected;
-
-  const BottomNavigationView({
-    super.key,
-    required this.selectedAppRoute,
-    required this.onAppRouteSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      items: const <BottomNavigationBarItem>[
-        BottomNavigationBarItem(
-          icon: Icon(Icons.smart_display),
-          label: 'Video Player',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.view_stream),
-          label: 'Video List',
-        ),
-      ],
-      currentIndex: selectedAppRoute.index,
-      onTap: (index) => onAppRouteSelected(AppRoute.values[index]),
-    );
   }
 }

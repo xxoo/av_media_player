@@ -1,13 +1,22 @@
-import Flutter
 import AVFoundation
+#if os(macOS)
+import FlutterMacOS
+#else
+import Flutter
+#endif
 
 public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
+#if os(macOS)
+		let messager = registrar.messenger
+#else
+		let messager = registrar.messenger()
+#endif
     registrar.addMethodCallDelegate(
       AVMediaPlayerPlugin(registrar: registrar),
       channel: FlutterMethodChannel(
 				name: "avMediaPlayer",
-				binaryMessenger: registrar.messenger()
+				binaryMessenger: messager
 			)
     )
   }
@@ -83,11 +92,14 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
 	var id: Int64!
   private var eventChannel: FlutterEventChannel!
-
-	private var watcher: Any?
+#if os(macOS)
+	private var displayLink: CVDisplayLink?
+#else
 	private var displayLink: CADisplayLink?
+#endif
   private var output: AVPlayerItemVideoOutput?
   private var eventSink: FlutterEventSink?
+	private var watcher: Any?
 	private var position = CMTime.zero
 	private var bufferPosition = CMTime.zero
   private var speed: Float = 1
@@ -99,10 +111,16 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	private var source: String?
 
   init(registrar: FlutterPluginRegistrar) {
-    textureRegistry = registrar.textures()
+#if os(macOS)
+		textureRegistry = registrar.textures
+		let messager = registrar.messenger
+#else
+		textureRegistry = registrar.textures()
+		let messager = registrar.messenger()
+#endif
 		super.init()
 		id = textureRegistry.register(self)
-		eventChannel = FlutterEventChannel(name: "avMediaPlayer/\(id!)", binaryMessenger: registrar.messenger())
+		eventChannel = FlutterEventChannel(name: "avMediaPlayer/\(id!)", binaryMessenger: messager)
     eventChannel.setStreamHandler(self)
     avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus), options: .old, context: nil)
@@ -147,7 +165,11 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			output = nil
 		}
 		if displayLink != nil {
+#if os(macOS)
+			CVDisplayLinkStop(displayLink!)
+#else
 			displayLink!.invalidate()
+#endif
 			displayLink = nil
 		}
 		stopWatcher()
@@ -241,7 +263,17 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		}
   }
 	
-	@objc private func render() {
+#if os(macOS)
+	func displayCallback() {
+		render()
+	}
+#else
+	@objc private func displayCallback() {
+		render()
+	}
+#endif
+	
+	private func render() {
 		if output != nil && displayLink != nil && reading == nil {
 			let t = output!.itemTime(forHostTime: CACurrentMediaTime())
 			if output!.hasNewPixelBuffer(forItemTime: t) {
@@ -291,8 +323,20 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 					if width > 0 && height > 0 && duration > 0 {
 						output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
 						currentItem.add(output!)
-						displayLink = CADisplayLink(target: self, selector: #selector(render))
+#if os(macOS)
+						CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
+						if displayLink != nil {
+							CVDisplayLinkSetOutputCallback(displayLink!, {(displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
+								let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
+								player.displayCallback()
+								return kCVReturnSuccess
+							}, Unmanaged.passUnretained(self).toOpaque())
+							CVDisplayLinkStart(displayLink!)
+						}
+#else
+						displayLink = CADisplayLink(target: self, selector: #selector(displayCallback))
 						displayLink!.add(to: .current, forMode: .common)
+#endif
 					}
 					avPlayer.volume = volume
 					state = 2

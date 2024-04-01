@@ -48,26 +48,24 @@ class _VideoListView extends State<VideoListView> {
                 ? null
                 : const EdgeInsets.only(bottom: 16),
             child: AspectRatio(
-              aspectRatio: _players[index].mediaInfo.value == null ||
-                      _players[index].mediaInfo.value!.width == 0 ||
-                      _players[index].mediaInfo.value!.height == 0
-                  ? 16 / 9
-                  : _players[index].mediaInfo.value!.width /
-                      _players[index].mediaInfo.value!.height,
+              aspectRatio: 16 / 9,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  _players[index].mediaInfo.value != null &&
-                          (_players[index].mediaInfo.value!.width == 0 ||
-                              _players[index].mediaInfo.value!.height == 0)
-                      ? const Text(
-                          'Audio only',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 24,
-                          ),
-                        )
-                      : AVMediaView(initPlayer: _players[index]),
+                  AVMediaView(
+                    initPlayer: _players[index],
+                    backgroundColor: Colors.black,
+                  ),
+                  if (_players[index].mediaInfo.value != null &&
+                      (_players[index].mediaInfo.value!.width == 0 ||
+                          _players[index].mediaInfo.value!.height == 0))
+                    const Text(
+                      'Audio only',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                      ),
+                    ),
                   if (_players[index].loading.value)
                     const CircularProgressIndicator(),
                 ],

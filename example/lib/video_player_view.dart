@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:av_media_player/index.dart';
 import 'defines.dart';
@@ -73,26 +72,24 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
                   ),
                   const SizedBox(height: 16),
                   AspectRatio(
-                    aspectRatio: _player.mediaInfo.value == null ||
-                            _player.mediaInfo.value!.width == 0 ||
-                            _player.mediaInfo.value!.height == 0
-                        ? 16 / 9
-                        : _player.mediaInfo.value!.width /
-                            _player.mediaInfo.value!.height,
+                    aspectRatio: 16 / 9,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        _player.mediaInfo.value != null &&
-                                (_player.mediaInfo.value!.width == 0 ||
-                                    _player.mediaInfo.value!.height == 0)
-                            ? const Text(
-                                'Audio only',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 24,
-                                ),
-                              )
-                            : AVMediaView(initPlayer: _player),
+                        AVMediaView(
+                          initPlayer: _player,
+                          backgroundColor: Colors.black,
+                        ),
+                        if (_player.mediaInfo.value != null &&
+                            (_player.mediaInfo.value!.width == 0 ||
+                                _player.mediaInfo.value!.height == 0))
+                          const Text(
+                            'Audio only',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                            ),
+                          ),
                         if (_player.loading.value)
                           const CircularProgressIndicator(),
                       ],
@@ -188,17 +185,13 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: videoSources.length,
-                itemBuilder: (context, index) => Container(
-                  alignment: Alignment.center,
-                  color: Colors.black,
-                  width: 228,
+                itemBuilder: (context, index) => AspectRatio(
+                  aspectRatio: 16 / 9,
                   child: GestureDetector(
-                    onTap: () {
-                      _player.open(videoSources[index].path);
-                    },
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: AVMediaView(initSource: videoSources[index].path),
+                    onTap: () => _player.open(videoSources[index].path),
+                    child: AVMediaView(
+                      initSource: videoSources[index].path,
+                      backgroundColor: Colors.black,
                     ),
                   ),
                 ),

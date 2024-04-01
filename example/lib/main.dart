@@ -20,10 +20,7 @@ class _MyAppState extends State<MyApp> {
             title: const Text('AV Media Player example app'),
           ),
           body: AspectRatio(
-            aspectRatio: _player?.mediaInfo.value == null
-                ? 16 / 9
-                : _player!.mediaInfo.value!.width /
-                    _player!.mediaInfo.value!.height,
+            aspectRatio: 16 / 9,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -32,9 +29,9 @@ class _MyAppState extends State<MyApp> {
                       'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
                   initLooping: true,
                   initAutoPlay: true,
+                  backgroundColor: Colors.black,
                   onCreated: (player) {
                     _player = player;
-                    player.mediaInfo.addListener(() => setState(() {}));
                     player.loading.addListener(() => setState(() {}));
                   },
                 ),
