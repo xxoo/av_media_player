@@ -1,15 +1,20 @@
-## 0.5.1
+## 0.5.4
 
-- first public release.
+- improve vsync handling on macos
+- fixed a resource leak on ios/macos
+
+## 0.5.3
+
+- improve dartdoc comments
+- improve examples
+- combine macos and ios backend code
+- add `backgroundColor` and `keepAspectRatio` support for `AVMediaView` widget
 
 ## 0.5.2
 
 - add dartdoc comments
 - replace default example to the simpe one
 
-## 0.5.3
+## 0.5.1
 
-- imporve dartdoc comments
-- imporve examples
-- combine macos and ios backend code
-- add `backgroundColor` and `keepAspectRatio` support for `AVMediaView` widget
+- first public release.
