@@ -13,37 +13,48 @@ class AVMediaPlayer {
   /// After the player is initialized it will be unique and never change again.
   final id = ValueNotifier<int?>(null);
 
-  /// The information of the current media. It's null before the media is opened.
+  /// The information of the current media.
+  /// It's null before the media is opened.
   final mediaInfo = ValueNotifier<MediaInfo?>(null);
 
-  /// The position of the current media in milliseconds. It's 0 before the media is opened.
+  /// The position of the current media in milliseconds.
+  /// It's 0 before the media is opened.
   final position = ValueNotifier(0);
 
-  /// The error message of the player. It's null before an error occurs.
+  /// The error message of the player.
+  /// It's null before an error occurs.
   final error = ValueNotifier<String?>(null);
 
-  /// The loading state of the player. It's false before opening a media.
+  /// The loading state of the player.
+  /// It's false before opening a media.
   final loading = ValueNotifier(false);
 
-  /// The playback state of the player. It's [PlaybackState.closed] berore a media is opened.
+  /// The playback state of the player.
+  /// It's [PlaybackState.closed] berore a media is opened.
   final playbackState = ValueNotifier(PlaybackState.closed);
 
-  /// The volume of the player. It's between 0 and 1, and defaults to 1.
+  /// The volume of the player.
+  /// It's between 0 and 1, and defaults to 1.
   final volume = ValueNotifier(1.0);
 
-  /// The speed of the player. It's between 0.5 and 2, and defaults to 1.
+  /// The speed of the player.
+  /// It's between 0.5 and 2, and defaults to 1.
   final speed = ValueNotifier(1.0);
 
-  /// Whether the player should loop the media. It's false by default.
+  /// Whether the player should loop the media.
+  /// It's false by default.
   final looping = ValueNotifier(false);
 
-  /// Whether the player should play the media automatically. It's false by default.
+  /// Whether the player should play the media automatically.
+  /// It's false by default.
   final autoPlay = ValueNotifier(false);
 
-  /// How many times the player has finished playing the current media. It will be reset to 0 when the media is closed.
+  /// How many times the player has finished playing the current media.
+  /// It will be reset to 0 when the media is closed.
   final finishedTimes = ValueNotifier(0);
 
-  /// The current buffer status of the player. It is only reported for network media.
+  /// The current buffer status of the player.
+  /// It is only reported for network media.
   final bufferRange = ValueNotifier(BufferRange.empty);
 
   // Event channel is much more efficient than method channel

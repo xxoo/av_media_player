@@ -1,7 +1,12 @@
+## 0.5.5
+
+- improve vsync handling on ios/macos
+- improve dartdoc comments
+
 ## 0.5.4
 
 - improve vsync handling on macos
-- fixed a resource leak on ios/macos
+- fixed a resource leak issue on ios/macos
 
 ## 0.5.3
 
@@ -13,7 +18,7 @@
 ## 0.5.2
 
 - add dartdoc comments
-- replace default example to the simpe one
+- change default example to the simple one
 
 ## 0.5.1
 

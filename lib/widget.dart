@@ -15,14 +15,17 @@ class AVMediaView extends StatefulWidget {
   final int? initPosition;
 
   /// Create a new [AVMediaView] widget.
-  /// If [initPlayer] is null, a new player will be created. You can get the player from [onCreated] callback.
+  /// If [initPlayer] is null, a new player will be created.
+  /// You can get the player from [onCreated] callback.
   ///
-  /// [backgroundColor] is the color to display when there is no video. This parameter can be changed by updating the widget.
+  /// [backgroundColor] is the color to display when there is no video.
+  /// This parameter can be changed by updating the widget.
   ///
-  /// [keepAspectRatio] is whether to keep the aspect ratio of the video. this parameter can be changed by updating the widget.
+  /// [keepAspectRatio] indicates whether the video should keep its original aspect ratio.
+  /// This parameter can be changed by updating the widget.
   ///
-  /// Other parameters only take efferts at the time this widget is created.
-  /// To changed them later, you need to calling the corresponding methods of the player.
+  /// Other parameters only take efferts at the time the widget is created.
+  /// To changed them later, you need to call the corresponding methods of the player.
   const AVMediaView({
     super.key,
     this.initPlayer,

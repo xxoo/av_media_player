@@ -9,7 +9,6 @@ public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
 #if os(macOS)
 		let messager = registrar.messenger
-		AVMediaPlayer.initTimeBase()
 #else
 		let messager = registrar.messenger()
 #endif
@@ -45,7 +44,9 @@ public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
       }
     case "open":
       result(nil)
-      if let args = call.arguments as? [String: Any], let id = args["id"] as? Int64, let value = args["value"] as? String {
+      if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? String {
         players[id]?.open(source: value)
       }
     case "close":
@@ -65,22 +66,30 @@ public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
       }
     case "seekTo":
       result(nil)
-      if let args = call.arguments as? [String: Any], let id = args["id"] as? Int64, let value = args["value"] as? Double {
+      if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Double {
 				players[id]?.seekTo(pos: CMTime(seconds: value / 1000, preferredTimescale: 1000))
       }
     case "setVolume":
       result(nil)
-      if let args = call.arguments as? [String: Any], let id = args["id"] as? Int64, let value = args["value"] as? Float {
+      if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Float {
         players[id]?.setVolume(vol: value)
       }
     case "setSpeed":
       result(nil)
-      if let args = call.arguments as? [String: Any], let id = args["id"] as? Int64, let value = args["value"] as? Float {
+      if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Float {
         players[id]?.setSpeed(spd: value)
       }
     case "setLooping":
       result(nil)
-      if let args = call.arguments as? [String: Any], let id = args["id"] as? Int64, let value = args["value"] as? Bool {
+      if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Bool {
         players[id]?.setLooping(loop: value)
       }
     default:
@@ -91,18 +100,15 @@ public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
 
 class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 #if os(macOS)
-	private static var timeBase = 0.0
-	static func initTimeBase() {
-		var timebaseInfo = mach_timebase_info_data_t()
-		mach_timebase_info(&timebaseInfo)
-		timeBase = Double(timebaseInfo.numer) / Double(timebaseInfo.denom) / 1_000_000_000.0
-	}
 	private var displayLink: CVDisplayLink?
-	func displayCallback(hostTime: UInt64) {
-		if output != nil && displayLink != nil && reading == nil {
-			let t = output!.itemTime(forHostTime: CFTimeInterval(Double(hostTime) * AVMediaPlayer.timeBase))
-			if output!.hasNewPixelBuffer(forItemTime: t) {
-				textureRegistry.textureFrameAvailable(id)
+	func displayCallback(now: UInt64, outputTime: UInt64) {
+		if output != nil && displayLink != nil {
+			let d = Int64(Double(outputTime - now) * Double(avPlayer.rate))
+			let t = output!.itemTime(forMachAbsoluteTime: Int64(now) + d)
+			if reading != t && output!.hasNewPixelBuffer(forItemTime: t) {
+				if reading == nil {
+					textureRegistry.textureFrameAvailable(id)
+				}
 				reading = t
 			}
 		}
@@ -110,15 +116,19 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 #else
 	private var displayLink: CADisplayLink?
 	@objc private func displayCallback() {
-		if output != nil && displayLink != nil && reading == nil {
-			let t = output!.itemTime(forHostTime: CACurrentMediaTime())
-			if output!.hasNewPixelBuffer(forItemTime: t) {
-				textureRegistry.textureFrameAvailable(id)
+		if output != nil && displayLink != nil {
+			let c = CACurrentMediaTime()
+			let t = output!.itemTime(forHostTime: c + (displayLink!.targetTimestamp - c) * Double(avPlayer.rate))
+			if reading != t && output!.hasNewPixelBuffer(forItemTime: t) {
+				if reading == nil {
+					textureRegistry.textureFrameAvailable(id)
+				}
 				reading = t
 			}
 		}
 	}
 #endif
+
   private let textureRegistry: FlutterTextureRegistry
   private let avPlayer = AVPlayer()
 
@@ -150,16 +160,16 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		id = textureRegistry.register(self)
 		eventChannel = FlutterEventChannel(name: "avMediaPlayer/\(id!)", binaryMessenger: messager)
     eventChannel.setStreamHandler(self)
-    avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus), options: .old, context: nil)
+    avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.loadedTimeRanges), context: nil)
   }
 
   deinit {
     eventSink?(FlutterEndOfEventStream)
     eventChannel.setStreamHandler(nil)
-    avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status))
     avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus))
+    avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status))
 		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.loadedTimeRanges))
 		textureRegistry.unregisterTexture(id)
   }
@@ -335,7 +345,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 						if displayLink != nil {
 							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
 								let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
-								player.displayCallback(hostTime: outputTime.pointee.hostTime)
+								player.displayCallback(now: now.pointee.hostTime, outputTime: outputTime.pointee.hostTime)
 								return kCVReturnSuccess
 							}, Unmanaged.passUnretained(self).toOpaque())
 							CVDisplayLinkStart(displayLink!)
