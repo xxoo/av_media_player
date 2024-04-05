@@ -1,3 +1,7 @@
+## 0.5.6
+
+- fix setState issue in `AVMediaView` widget
+
 ## 0.5.5
 
 - improve vsync handling on ios/macos

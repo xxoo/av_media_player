@@ -46,7 +46,6 @@ class AVMediaView extends StatefulWidget {
 
 class _AVMediaState extends State<AVMediaView> {
   bool _foreignPlayer = false;
-  bool _hasVideo = false;
   AVMediaPlayer? _player;
 
   @override
@@ -64,7 +63,6 @@ class _AVMediaState extends State<AVMediaView> {
     } else {
       _player = widget.initPlayer!;
       _foreignPlayer = true;
-      _hasVideo = _checkVideo();
       if (widget.initSource != null) {
         _player!.open(widget.initSource!);
       }
@@ -97,9 +95,9 @@ class _AVMediaState extends State<AVMediaView> {
   @override
   void didUpdateWidget(AVMediaView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((widget.keepAspectRatio != oldWidget.keepAspectRatio && _hasVideo) ||
-        (widget.backgroundColor != oldWidget.backgroundColor && !_hasVideo)) {
-      setState(() {});
+    if (widget.keepAspectRatio != oldWidget.keepAspectRatio ||
+        widget.backgroundColor != oldWidget.backgroundColor) {
+      _update();
     }
   }
 
@@ -110,7 +108,7 @@ class _AVMediaState extends State<AVMediaView> {
         _player?.mediaInfo.removeListener(_update);
         //maybe the player will be reused by the user.
         //but at least it should be closed to prevent texture link error if there is an open video.
-        if (_hasVideo) {
+        if (_checkVideo()) {
           _player!.close();
         }
       } catch (_) {}
@@ -122,7 +120,7 @@ class _AVMediaState extends State<AVMediaView> {
 
   @override
   Widget build(BuildContext context) {
-    if (_hasVideo) {
+    if (_checkVideo()) {
       final texture = Texture(textureId: _player!.id.value!);
       return widget.keepAspectRatio
           ? AspectRatio(
@@ -150,11 +148,23 @@ class _AVMediaState extends State<AVMediaView> {
       _player!.mediaInfo.value!.duration > 0;
 
   void _update() {
-    final hasVideo = _checkVideo();
-    if (_hasVideo != hasVideo) {
-      setState(() {
-        _hasVideo = hasVideo;
-      });
+    try {
+      setState(() {});
+    } catch (e) {
+      //some opreation may trigger the builder while building is in process.
+      //in this situation, we just queue a new frame to update the state.
+      if (e is FlutterError &&
+          e.message.substring(0, 51) ==
+              'setState() or markNeedsBuild() called during build.') {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          try {
+            //maybe the widget is disposed.
+            setState(() {});
+          } catch (_) {}
+        });
+      } else {
+        rethrow;
+      }
     }
   }
 }
