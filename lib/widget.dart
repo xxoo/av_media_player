@@ -45,7 +45,7 @@ class AVMediaView extends StatefulWidget {
   State<AVMediaView> createState() => _AVMediaState();
 }
 
-class _AVMediaState extends State<AVMediaView> {
+class _AVMediaState extends State<AVMediaView> with SetStateSafely {
   bool _foreignPlayer = false;
   AVMediaPlayer? _player;
 
@@ -156,24 +156,5 @@ class _AVMediaState extends State<AVMediaView> {
       _player!.mediaInfo.value!.height > 0 &&
       _player!.mediaInfo.value!.duration > 0;
 
-  void _update() {
-    try {
-      setState(() {});
-    } catch (e) {
-      //some opreation may trigger the builder while building is in process.
-      //in this situation, we just queue a new frame to update the state.
-      if (e is FlutterError &&
-          e.message.substring(0, 38) ==
-              'setState() or markNeedsBuild() called ') {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          //check if the widget is still mounted before updating.
-          if (mounted) {
-            _update();
-          }
-        });
-      } else {
-        rethrow;
-      }
-    }
-  }
+  void _update() => setState(() {});
 }

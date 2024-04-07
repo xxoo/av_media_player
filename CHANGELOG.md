@@ -1,3 +1,7 @@
+## 0.5.8
+
+- interduce `SetStateSafely` mixin to prevent errors while `setState` is called on a bad time.
+
 ## 0.5.7
 
 - breaking change: remove `keepAspectRatio` property from `AVMediaView` widget and add `sizingMode` property instead.

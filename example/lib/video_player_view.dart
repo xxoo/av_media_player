@@ -10,7 +10,7 @@ class VideoPlayerView extends StatefulWidget {
   State<VideoPlayerView> createState() => _VideoPlayerViewState();
 }
 
-class _VideoPlayerViewState extends State<VideoPlayerView> {
+class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
   late final AVMediaPlayer _player;
 
   @override
@@ -224,16 +224,5 @@ class _VideoPlayerViewState extends State<VideoPlayerView> {
     final twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
     final twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
     return '${duration.inHours > 0 ? '${duration.inHours}:' : ''}$twoDigitMinutes:$twoDigitSeconds';
-  }
-
-  //some opreation may trigger the builder while building is in process.
-  //in this situation, we just queue a new frame to update the state.
-  @override
-  void setState(void Function() fn) {
-    try {
-      super.setState(fn);
-    } catch (e) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => super.setState(fn));
-    }
   }
 }

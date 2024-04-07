@@ -10,7 +10,7 @@ class VideoListView extends StatefulWidget {
   State<StatefulWidget> createState() => _VideoListView();
 }
 
-class _VideoListView extends State<VideoListView> {
+class _VideoListView extends State<VideoListView> with SetStateSafely {
   final _players = <AVMediaPlayer>[];
   @override
   void initState() {
@@ -89,15 +89,4 @@ class _VideoListView extends State<VideoListView> {
         ),
         itemCount: _players.length,
       );
-
-  //some opreation may trigger the builder while building is in process.
-  //in this situation, we just queue a new frame to update the state.
-  @override
-  void setState(void Function() fn) {
-    try {
-      super.setState(fn);
-    } catch (e) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => super.setState(fn));
-    }
-  }
 }
