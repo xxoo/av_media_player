@@ -1,3 +1,7 @@
+## 0.5.7
+
+- breaking change: remove `keepAspectRatio` property from `AVMediaView` widget and add `sizingMode` property instead.
+
 ## 0.5.6
 
 - fix setState issue in `AVMediaView` widget

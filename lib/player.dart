@@ -237,6 +237,8 @@ class AVMediaPlayer {
   }
 
   /// Pause the current media file.
+  ///
+  /// If the the player is opening a media file, calling this method will set autoplay to false
   bool pause() {
     if (id.value != null && playbackState.value == PlaybackState.playing) {
       _methodChannel.invokeMethod('pause', id.value);

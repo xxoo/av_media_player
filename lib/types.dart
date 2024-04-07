@@ -18,3 +18,6 @@ class MediaInfo {
 
 /// This type is used by [AVMediaPlayer], for showing current playback state.
 enum PlaybackState { playing, paused, closed }
+
+/// This type is used by [AVMediaView], for sizing the video.
+enum SizingMode { free, keepAspectRatio, originalSize }

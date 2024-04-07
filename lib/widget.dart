@@ -1,12 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'player.dart';
+import 'types.dart';
 
 /// The widget to display video for [AVMediaPlayer].
 class AVMediaView extends StatefulWidget {
   final AVMediaPlayer? initPlayer;
   final void Function(AVMediaPlayer player)? onCreated;
   final Color? backgroundColor;
-  final bool keepAspectRatio;
+  final SizingMode sizingMode;
   final String? initSource;
   final bool? initAutoPlay;
   final bool? initLooping;
@@ -21,10 +22,10 @@ class AVMediaView extends StatefulWidget {
   /// [backgroundColor] is the color to display when there is no video.
   /// This parameter can be changed by updating the widget.
   ///
-  /// [keepAspectRatio] indicates whether the video should keep its original aspect ratio.
+  /// [sizingMode] indicates how to size the video.
   /// This parameter can be changed by updating the widget.
   ///
-  /// Other parameters only take efferts at the time the widget is created.
+  /// Other parameters only take efferts at the time the widget is mounted.
   /// To changed them later, you need to call the corresponding methods of the player.
   const AVMediaView({
     super.key,
@@ -37,7 +38,7 @@ class AVMediaView extends StatefulWidget {
     this.initPosition,
     this.onCreated,
     this.backgroundColor,
-    this.keepAspectRatio = true,
+    this.sizingMode = SizingMode.keepAspectRatio,
   });
 
   @override
@@ -95,7 +96,7 @@ class _AVMediaState extends State<AVMediaView> {
   @override
   void didUpdateWidget(AVMediaView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.keepAspectRatio != oldWidget.keepAspectRatio ||
+    if (widget.sizingMode != oldWidget.sizingMode ||
         widget.backgroundColor != oldWidget.backgroundColor) {
       _update();
     }
@@ -122,13 +123,21 @@ class _AVMediaState extends State<AVMediaView> {
   Widget build(BuildContext context) {
     if (_checkVideo()) {
       final texture = Texture(textureId: _player!.id.value!);
-      return widget.keepAspectRatio
-          ? AspectRatio(
-              aspectRatio: _player!.mediaInfo.value!.width /
-                  _player!.mediaInfo.value!.height,
-              child: texture,
-            )
-          : texture;
+      if (widget.sizingMode == SizingMode.keepAspectRatio) {
+        return AspectRatio(
+          aspectRatio: _player!.mediaInfo.value!.width /
+              _player!.mediaInfo.value!.height,
+          child: texture,
+        );
+      } else if (widget.sizingMode == SizingMode.originalSize) {
+        return SizedBox(
+          width: _player!.mediaInfo.value!.width.toDouble(),
+          height: _player!.mediaInfo.value!.height.toDouble(),
+          child: texture,
+        );
+      } else {
+        return texture;
+      }
     } else {
       return Container(color: widget.backgroundColor);
     }
@@ -154,13 +163,13 @@ class _AVMediaState extends State<AVMediaView> {
       //some opreation may trigger the builder while building is in process.
       //in this situation, we just queue a new frame to update the state.
       if (e is FlutterError &&
-          e.message.substring(0, 51) ==
-              'setState() or markNeedsBuild() called during build.') {
+          e.message.substring(0, 38) ==
+              'setState() or markNeedsBuild() called ') {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          try {
-            //maybe the widget is disposed.
-            setState(() {});
-          } catch (_) {}
+          //check if the widget is still mounted before updating.
+          if (mounted) {
+            _update();
+          }
         });
       } else {
         rethrow;

@@ -12,7 +12,7 @@ import kotlin.math.max
 
 class AVMediaPlayerPlugin: FlutterPlugin, MethodChannel.MethodCallHandler {
   private lateinit var binding: FlutterPlugin.FlutterPluginBinding
-  private lateinit var methodChannel : MethodChannel
+  private lateinit var methodChannel: MethodChannel
   private val players = mutableMapOf<Long, AVMediaPlayer>()
 
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
