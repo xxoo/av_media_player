@@ -1,3 +1,7 @@
+## 0.5.9
+
+- check current position in seekTo calls from native side.
+
 ## 0.5.8
 
 - interduce `SetStateSafely` mixin to prevent errors while `setState` is called on a bad time.

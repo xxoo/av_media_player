@@ -234,8 +234,12 @@ class AVMediaPlayer(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.
   }
 
   fun seekTo(pos: Long) {
-    finished = false
-    mediaPlayer.seekTo(pos, MediaPlayer.SEEK_CLOSEST)
+    if (mediaPlayer.currentPosition == pos) {
+      eventSink?.success(mapOf("event" to "seekEnd"))
+    } else {
+      finished = false
+      mediaPlayer.seekTo(pos, MediaPlayer.SEEK_CLOSEST)
+    }
   }
 
   fun setVolume(vol: Float) {

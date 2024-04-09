@@ -247,14 +247,18 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
   }
 
   func seekTo(pos: CMTime) {
-    avPlayer.seek(to: pos, toleranceBefore: .zero, toleranceAfter: .zero) {[weak self] finished in
-			if finished && self != nil {
-				self!.eventSink?(["event": "seekEnd"])
-				if self!.watcher == nil {
-          self!.setPosition(time: self!.avPlayer.currentTime())
-        }
-      }
-    }
+		if avPlayer.currentTime() == pos {
+			eventSink?(["event": "seekEnd"])
+		} else {
+			avPlayer.seek(to: pos, toleranceBefore: .zero, toleranceAfter: .zero) {[weak self] finished in
+				if finished && self != nil {
+					self!.eventSink?(["event": "seekEnd"])
+					if self!.watcher == nil {
+						self!.setPosition(time: self!.avPlayer.currentTime())
+					}
+				}
+			}
+		}
   }
 
   func setVolume(vol: Float) {

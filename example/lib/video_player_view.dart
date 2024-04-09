@@ -11,12 +11,11 @@ class VideoPlayerView extends StatefulWidget {
 }
 
 class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
-  late final AVMediaPlayer _player;
+  final AVMediaPlayer _player = AVMediaPlayer();
 
   @override
   initState() {
     super.initState();
-    _player = AVMediaPlayer(initSource: videoSources.first.path);
     _player.playbackState.addListener(() => setState(() {}));
     _player.position.addListener(() => setState(() {}));
     _player.speed.addListener(() => setState(() {}));
@@ -27,10 +26,8 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
     _player.autoPlay.addListener(() => setState(() {}));
     _player.error
         .addListener(() => debugPrint('error: ${_player.error.value}'));
-    _player.bufferRange.addListener(() {
-      debugPrint(
-          'pos: ${_player.position.value} begin: ${_player.bufferRange.value.begin} end: ${_player.bufferRange.value.end}');
-    });
+    _player.bufferRange.addListener(() => debugPrint(
+        'pos: ${_player.position.value} buffer begin: ${_player.bufferRange.value.begin} buffer end: ${_player.bufferRange.value.end}'));
   }
 
   @override
@@ -55,17 +52,15 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                     children: [
                       Checkbox(
                         value: _player.autoPlay.value,
-                        onChanged: (value) {
-                          setState(() => _player.setAutoPlay(value ?? false));
-                        },
+                        onChanged: (value) =>
+                            _player.setAutoPlay(value ?? false),
                       ),
                       const Text('Autoplay'),
                       const Spacer(),
                       Checkbox(
                         value: _player.looping.value,
-                        onChanged: (value) {
-                          setState(() => _player.setLooping(value ?? false));
-                        },
+                        onChanged: (value) =>
+                            _player.setLooping(value ?? false),
                       ),
                       const Text('Playback loop'),
                     ],
@@ -79,6 +74,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                         AVMediaView(
                           initPlayer: _player,
                           backgroundColor: Colors.black,
+                          initSource: videoSources.first.path,
                         ),
                         if (_player.mediaInfo.value != null &&
                             (_player.mediaInfo.value!.width == 0 ||

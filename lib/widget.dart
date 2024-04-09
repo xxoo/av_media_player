@@ -95,10 +95,9 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
 
   @override
   void didUpdateWidget(AVMediaView oldWidget) {
-    super.didUpdateWidget(oldWidget);
     if (widget.sizingMode != oldWidget.sizingMode ||
         widget.backgroundColor != oldWidget.backgroundColor) {
-      _update();
+      super.didUpdateWidget(oldWidget);
     }
   }
 
