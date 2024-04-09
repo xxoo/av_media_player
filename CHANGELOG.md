@@ -1,3 +1,7 @@
+## 0.6.0
+
+- fix type mismatch issue in android seekTo method.
+
 ## 0.5.9
 
 - check current position in seekTo calls from native side.

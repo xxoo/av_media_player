@@ -65,7 +65,7 @@ class AVMediaPlayerPlugin: FlutterPlugin, MethodChannel.MethodCallHandler {
       }
       "seekTo" -> {
         val id = call.argument<Long>("id")!!
-        val pos = call.argument<Long>("value")!!
+        val pos = call.argument<Int>("value")!!
         players[id]?.seekTo(pos)
         result.success(null)
       }
@@ -233,12 +233,12 @@ class AVMediaPlayer(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.
     }
   }
 
-  fun seekTo(pos: Long) {
+  fun seekTo(pos: Int) {
     if (mediaPlayer.currentPosition == pos) {
       eventSink?.success(mapOf("event" to "seekEnd"))
     } else {
       finished = false
-      mediaPlayer.seekTo(pos, MediaPlayer.SEEK_CLOSEST)
+      mediaPlayer.seekTo(pos.toLong(), MediaPlayer.SEEK_CLOSEST)
     }
   }
 
