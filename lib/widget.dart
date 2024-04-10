@@ -95,7 +95,8 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
 
   @override
   void didUpdateWidget(AVMediaView oldWidget) {
-    if (widget.sizingMode != oldWidget.sizingMode || widget.backgroundColor != oldWidget.backgroundColor) {
+    if (widget.sizingMode != oldWidget.sizingMode ||
+        widget.backgroundColor != oldWidget.backgroundColor) {
       super.didUpdateWidget(oldWidget);
     }
   }
@@ -123,7 +124,8 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
       final texture = Texture(textureId: _player!.id.value!);
       if (widget.sizingMode == SizingMode.keepAspectRatio) {
         return AspectRatio(
-          aspectRatio: _player!.mediaInfo.value!.width / _player!.mediaInfo.value!.height,
+          aspectRatio: _player!.mediaInfo.value!.width /
+              _player!.mediaInfo.value!.height,
           child: texture,
         );
       } else if (widget.sizingMode == SizingMode.originalSize) {
@@ -147,7 +149,11 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
     }
   }
 
-  bool _hasVideo() => _player?.mediaInfo.value != null && _player!.mediaInfo.value!.width > 0 && _player!.mediaInfo.value!.height > 0 && _player!.mediaInfo.value!.duration > 0;
+  bool _hasVideo() =>
+      _player?.mediaInfo.value != null &&
+      _player!.mediaInfo.value!.width > 0 &&
+      _player!.mediaInfo.value!.height > 0 &&
+      _player!.mediaInfo.value!.duration > 0;
 
   void _update() => setState(() {});
 }

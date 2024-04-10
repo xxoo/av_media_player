@@ -75,7 +75,9 @@ class AVMediaPlayer {
   }) {
     _methodChannel.invokeMethod('create').then((value) {
       id.value = value as int;
-      _eventSubscription = EventChannel('avMediaPlayer/${id.value}').receiveBroadcastStream().listen((event) {
+      _eventSubscription = EventChannel('avMediaPlayer/${id.value}')
+          .receiveBroadcastStream()
+          .listen((event) {
         final e = event as Map;
         if (e['event'] == 'mediaInfo') {
           if (_source == e['source']) {
@@ -107,7 +109,9 @@ class AVMediaPlayer {
           if (mediaInfo.value != null) {
             final begin = e['begin'] as int;
             final end = e['end'] as int;
-            bufferRange.value = begin == 0 && end == 0 ? BufferRange.empty : BufferRange(begin, end);
+            bufferRange.value = begin == 0 && end == 0
+                ? BufferRange.empty
+                : BufferRange(begin, end);
           }
         } else if (e['event'] == 'error') {
           //ignore errors when player is closed
@@ -122,10 +126,14 @@ class AVMediaPlayer {
             playbackState.value = PlaybackState.closed;
           }
         } else if (e['event'] == 'loading') {
-          loading.value = e['value'];
+          if (mediaInfo.value != null) {
+            loading.value = e['value'];
+          }
         } else if (e['event'] == 'seekEnd') {
-          _seeked = false;
-          loading.value = false;
+          if (mediaInfo.value != null) {
+            _seeked = false;
+            loading.value = false;
+          }
         } else if (e['event'] == 'finished') {
           if (!looping.value) {
             position.value = 0;
@@ -139,10 +147,12 @@ class AVMediaPlayer {
         open(_source!);
       }
       if (volume.value != 1) {
-        _methodChannel.invokeMethod('setVolume', {'id': value, 'value': volume.value});
+        _methodChannel
+            .invokeMethod('setVolume', {'id': value, 'value': volume.value});
       }
       if (speed.value != 1) {
-        _methodChannel.invokeMethod('setSpeed', {'id': value, 'value': speed.value});
+        _methodChannel
+            .invokeMethod('setSpeed', {'id': value, 'value': speed.value});
       }
       if (looping.value) {
         _methodChannel.invokeMethod('setLooping', {'id': value, 'value': true});
@@ -203,7 +213,8 @@ class AVMediaPlayer {
   /// Close or stop opening the media file.
   void close() {
     _source = null;
-    if (id.value != null && (playbackState.value != PlaybackState.closed || loading.value)) {
+    if (id.value != null &&
+        (playbackState.value != PlaybackState.closed || loading.value)) {
       _methodChannel.invokeMethod('close', id.value);
       mediaInfo.value = null;
       position.value = 0;
@@ -223,7 +234,9 @@ class AVMediaPlayer {
         _methodChannel.invokeMethod('play', id.value);
         playbackState.value = PlaybackState.playing;
         return true;
-      } else if (!autoPlay.value && playbackState.value == PlaybackState.closed && _source != null) {
+      } else if (!autoPlay.value &&
+          playbackState.value == PlaybackState.closed &&
+          _source != null) {
         setAutoPlay(true);
         return true;
       }
@@ -242,7 +255,9 @@ class AVMediaPlayer {
         loading.value = false;
       }
       return true;
-    } else if (autoPlay.value && playbackState.value == PlaybackState.closed && _source != null) {
+    } else if (autoPlay.value &&
+        playbackState.value == PlaybackState.closed &&
+        _source != null) {
       setAutoPlay(false);
       return true;
     }
@@ -259,7 +274,8 @@ class AVMediaPlayer {
       } else if (position > mediaInfo.value!.duration) {
         position = mediaInfo.value!.duration;
       }
-      _methodChannel.invokeMethod('seekTo', {'id': id.value, 'value': position});
+      _methodChannel
+          .invokeMethod('seekTo', {'id': id.value, 'value': position});
       loading.value = true;
       _seeked = true;
       return true;
@@ -277,7 +293,8 @@ class AVMediaPlayer {
       volume = 1;
     }
     if (this.volume.value != volume) {
-      _methodChannel.invokeMethod('setVolume', {'id': id.value, 'value': volume});
+      _methodChannel
+          .invokeMethod('setVolume', {'id': id.value, 'value': volume});
       this.volume.value = volume;
       return true;
     }
@@ -295,7 +312,8 @@ class AVMediaPlayer {
     }
     if (this.speed.value != speed) {
       if (id.value != null) {
-        _methodChannel.invokeMethod('setSpeed', {'id': id.value, 'value': speed});
+        _methodChannel
+            .invokeMethod('setSpeed', {'id': id.value, 'value': speed});
       }
       this.speed.value = speed;
       return true;
@@ -307,7 +325,8 @@ class AVMediaPlayer {
   bool setLooping(bool looping) {
     if (looping != this.looping.value) {
       if (id.value != null) {
-        _methodChannel.invokeMethod('setLooping', {'id': id.value, 'value': looping});
+        _methodChannel
+            .invokeMethod('setLooping', {'id': id.value, 'value': looping});
       }
       this.looping.value = looping;
       return true;

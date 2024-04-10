@@ -1,3 +1,7 @@
+## 0.6.2
+
+- fix code formatting issues.
+
 ## 0.6.1
 
 - `seekTo` won't increase `finishedTimes` any more if the player is not in `playing` state.

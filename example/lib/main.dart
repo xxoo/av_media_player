@@ -23,7 +23,8 @@ class _MyAppState extends State<MyApp> {
             alignment: Alignment.center,
             children: [
               AVMediaView(
-                initSource: 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+                initSource:
+                    'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
                 initLooping: true,
                 initAutoPlay: true,
                 onCreated: (player) {
@@ -31,7 +32,8 @@ class _MyAppState extends State<MyApp> {
                   player.loading.addListener(() => setState(() {}));
                 },
               ),
-              if (_player?.loading.value ?? true) const CircularProgressIndicator(),
+              if (_player?.loading.value ?? true)
+                const CircularProgressIndicator(),
             ],
           ),
         ),

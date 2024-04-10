@@ -36,13 +36,17 @@ class _VideoListView extends State<VideoListView> with SetStateSafely {
   @override
   Widget build(BuildContext context) => InViewNotifierList(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 200),
-        isInViewPortCondition: (double deltaTop, double deltaBottom, double viewPortDimension) {
-          return deltaTop < (0.5 * viewPortDimension) && deltaBottom > (0.5 * viewPortDimension);
+        isInViewPortCondition:
+            (double deltaTop, double deltaBottom, double viewPortDimension) {
+          return deltaTop < (0.5 * viewPortDimension) &&
+              deltaBottom > (0.5 * viewPortDimension);
         },
         builder: (context, index) => InViewNotifierWidget(
           id: '$index',
           child: Container(
-            margin: index == _players.length - 1 ? null : const EdgeInsets.only(bottom: 16),
+            margin: index == _players.length - 1
+                ? null
+                : const EdgeInsets.only(bottom: 16),
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: Stack(
@@ -52,7 +56,9 @@ class _VideoListView extends State<VideoListView> with SetStateSafely {
                     initPlayer: _players[index],
                     backgroundColor: Colors.black,
                   ),
-                  if (_players[index].mediaInfo.value != null && (_players[index].mediaInfo.value!.width == 0 || _players[index].mediaInfo.value!.height == 0))
+                  if (_players[index].mediaInfo.value != null &&
+                      (_players[index].mediaInfo.value!.width == 0 ||
+                          _players[index].mediaInfo.value!.height == 0))
                     const Text(
                       'Audio only',
                       style: TextStyle(
@@ -60,7 +66,8 @@ class _VideoListView extends State<VideoListView> with SetStateSafely {
                         fontSize: 24,
                       ),
                     ),
-                  if (_players[index].loading.value) const CircularProgressIndicator(),
+                  if (_players[index].loading.value)
+                    const CircularProgressIndicator(),
                 ],
               ),
             ),
