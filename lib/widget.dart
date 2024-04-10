@@ -95,8 +95,7 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
 
   @override
   void didUpdateWidget(AVMediaView oldWidget) {
-    if (widget.sizingMode != oldWidget.sizingMode ||
-        widget.backgroundColor != oldWidget.backgroundColor) {
+    if (widget.sizingMode != oldWidget.sizingMode || widget.backgroundColor != oldWidget.backgroundColor) {
       super.didUpdateWidget(oldWidget);
     }
   }
@@ -108,7 +107,7 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
         _player?.mediaInfo.removeListener(_update);
         //maybe the player will be reused by the user.
         //but at least it should be closed to prevent texture link error if there is an open video.
-        if (_checkVideo()) {
+        if (_hasVideo()) {
           _player!.close();
         }
       } catch (_) {}
@@ -120,12 +119,11 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
 
   @override
   Widget build(BuildContext context) {
-    if (_checkVideo()) {
+    if (_hasVideo()) {
       final texture = Texture(textureId: _player!.id.value!);
       if (widget.sizingMode == SizingMode.keepAspectRatio) {
         return AspectRatio(
-          aspectRatio: _player!.mediaInfo.value!.width /
-              _player!.mediaInfo.value!.height,
+          aspectRatio: _player!.mediaInfo.value!.width / _player!.mediaInfo.value!.height,
           child: texture,
         );
       } else if (widget.sizingMode == SizingMode.originalSize) {
@@ -149,11 +147,7 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
     }
   }
 
-  bool _checkVideo() =>
-      _player?.mediaInfo.value != null &&
-      _player!.mediaInfo.value!.width > 0 &&
-      _player!.mediaInfo.value!.height > 0 &&
-      _player!.mediaInfo.value!.duration > 0;
+  bool _hasVideo() => _player?.mediaInfo.value != null && _player!.mediaInfo.value!.width > 0 && _player!.mediaInfo.value!.height > 0 && _player!.mediaInfo.value!.duration > 0;
 
   void _update() => setState(() {});
 }

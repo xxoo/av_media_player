@@ -62,6 +62,7 @@ class AVMediaPlayer {
   StreamSubscription? _eventSubscription;
   String? _source;
   int? _position;
+  bool _seeked = false;
 
   /// All the parameters are optional, and can be changed later by calling the corresponding methods.
   AVMediaPlayer({
@@ -74,9 +75,7 @@ class AVMediaPlayer {
   }) {
     _methodChannel.invokeMethod('create').then((value) {
       id.value = value as int;
-      _eventSubscription = EventChannel('avMediaPlayer/${id.value}')
-          .receiveBroadcastStream()
-          .listen((event) {
+      _eventSubscription = EventChannel('avMediaPlayer/${id.value}').receiveBroadcastStream().listen((event) {
         final e = event as Map;
         if (e['event'] == 'mediaInfo') {
           if (_source == e['source']) {
@@ -108,9 +107,7 @@ class AVMediaPlayer {
           if (mediaInfo.value != null) {
             final begin = e['begin'] as int;
             final end = e['end'] as int;
-            bufferRange.value = begin == 0 && end == 0
-                ? BufferRange.empty
-                : BufferRange(begin, end);
+            bufferRange.value = begin == 0 && end == 0 ? BufferRange.empty : BufferRange(begin, end);
           }
         } else if (e['event'] == 'error') {
           //ignore errors when player is closed
@@ -127,6 +124,7 @@ class AVMediaPlayer {
         } else if (e['event'] == 'loading') {
           loading.value = e['value'];
         } else if (e['event'] == 'seekEnd') {
+          _seeked = false;
           loading.value = false;
         } else if (e['event'] == 'finished') {
           if (!looping.value) {
@@ -141,13 +139,13 @@ class AVMediaPlayer {
         open(_source!);
       }
       if (volume.value != 1) {
-        setVolume(volume.value);
+        _methodChannel.invokeMethod('setVolume', {'id': value, 'value': volume.value});
       }
       if (speed.value != 1) {
-        setSpeed(speed.value);
+        _methodChannel.invokeMethod('setSpeed', {'id': value, 'value': speed.value});
       }
       if (looping.value) {
-        setLooping(true);
+        _methodChannel.invokeMethod('setLooping', {'id': value, 'value': true});
       }
     });
     _position = initPosition;
@@ -205,8 +203,7 @@ class AVMediaPlayer {
   /// Close or stop opening the media file.
   void close() {
     _source = null;
-    if (id.value != null &&
-        (playbackState.value != PlaybackState.closed || loading.value)) {
+    if (id.value != null && (playbackState.value != PlaybackState.closed || loading.value)) {
       _methodChannel.invokeMethod('close', id.value);
       mediaInfo.value = null;
       position.value = 0;
@@ -226,9 +223,7 @@ class AVMediaPlayer {
         _methodChannel.invokeMethod('play', id.value);
         playbackState.value = PlaybackState.playing;
         return true;
-      } else if (!autoPlay.value &&
-          playbackState.value == PlaybackState.closed &&
-          _source != null) {
+      } else if (!autoPlay.value && playbackState.value == PlaybackState.closed && _source != null) {
         setAutoPlay(true);
         return true;
       }
@@ -242,12 +237,12 @@ class AVMediaPlayer {
   bool pause() {
     if (id.value != null && playbackState.value == PlaybackState.playing) {
       _methodChannel.invokeMethod('pause', id.value);
-      loading.value = false;
       playbackState.value = PlaybackState.paused;
+      if (!_seeked) {
+        loading.value = false;
+      }
       return true;
-    } else if (autoPlay.value &&
-        playbackState.value == PlaybackState.closed &&
-        _source != null) {
+    } else if (autoPlay.value && playbackState.value == PlaybackState.closed && _source != null) {
       setAutoPlay(false);
       return true;
     }
@@ -258,13 +253,15 @@ class AVMediaPlayer {
   ///
   /// position: The position to seek to in milliseconds.
   bool seekTo(int position) {
-    if (id.value != null &&
-        mediaInfo.value != null &&
-        position >= 0 &&
-        position <= mediaInfo.value!.duration) {
-      _methodChannel
-          .invokeMethod('seekTo', {'id': id.value, 'value': position});
+    if (id.value != null && mediaInfo.value != null) {
+      if (position < 0) {
+        position = 0;
+      } else if (position > mediaInfo.value!.duration) {
+        position = mediaInfo.value!.duration;
+      }
+      _methodChannel.invokeMethod('seekTo', {'id': id.value, 'value': position});
       loading.value = true;
+      _seeked = true;
       return true;
     }
     return false;
@@ -274,9 +271,13 @@ class AVMediaPlayer {
   ///
   /// volume: The volume to set between 0 and 1.
   bool setVolume(double volume) {
-    if (this.volume.value != volume && volume >= 0 && volume <= 1) {
-      _methodChannel
-          .invokeMethod('setVolume', {'id': id.value, 'value': volume});
+    if (volume < 0) {
+      volume = 0;
+    } else if (volume > 1) {
+      volume = 1;
+    }
+    if (this.volume.value != volume) {
+      _methodChannel.invokeMethod('setVolume', {'id': id.value, 'value': volume});
       this.volume.value = volume;
       return true;
     }
@@ -287,10 +288,14 @@ class AVMediaPlayer {
   ///
   /// speed: The speed to set between 0.5 and 2.
   bool setSpeed(double speed) {
-    if (speed >= 0.5 && speed <= 2) {
+    if (speed < 0.5) {
+      speed = 0.5;
+    } else if (speed > 2) {
+      speed = 2;
+    }
+    if (this.speed.value != speed) {
       if (id.value != null) {
-        _methodChannel
-            .invokeMethod('setSpeed', {'id': id.value, 'value': speed});
+        _methodChannel.invokeMethod('setSpeed', {'id': id.value, 'value': speed});
       }
       this.speed.value = speed;
       return true;
@@ -299,16 +304,23 @@ class AVMediaPlayer {
   }
 
   /// Set whether the player should loop the media.
-  void setLooping(bool looping) {
-    if (id.value != null) {
-      _methodChannel
-          .invokeMethod('setLooping', {'id': id.value, 'value': looping});
+  bool setLooping(bool looping) {
+    if (looping != this.looping.value) {
+      if (id.value != null) {
+        _methodChannel.invokeMethod('setLooping', {'id': id.value, 'value': looping});
+      }
+      this.looping.value = looping;
+      return true;
     }
-    this.looping.value = looping;
+    return false;
   }
 
   /// Set whether the player should play the media automatically.
-  void setAutoPlay(bool autoPlay) {
-    this.autoPlay.value = autoPlay;
+  bool setAutoPlay(bool autoPlay) {
+    if (autoPlay != this.autoPlay.value) {
+      this.autoPlay.value = autoPlay;
+      return true;
+    }
+    return false;
   }
 }

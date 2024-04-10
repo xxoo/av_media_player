@@ -12,9 +12,7 @@ mixin SetStateSafely<T extends StatefulWidget> on State<T> {
     } catch (e) {
       //some opreation may trigger the builder while building is in process.
       //in this situation, we just queue a new frame to update the state.
-      if (e is FlutterError &&
-          e.message.substring(0, 38) ==
-              'setState() or markNeedsBuild() called ') {
+      if (e is FlutterError && e.message.substring(0, 38) == 'setState() or markNeedsBuild() called ') {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           //check if the widget is still mounted before updating.
           if (mounted) {

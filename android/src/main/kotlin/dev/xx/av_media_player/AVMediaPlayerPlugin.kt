@@ -128,17 +128,17 @@ class AVMediaPlayer(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.
       stillPreparing = true
     }
     mediaPlayer.setOnCompletionListener {
-      if (looping && state == 3) {
-        play()
-      } else {
-        if (state == 3) {
+      if (state == 3) {
+        if (looping) {
+          play()
+        } else {
           state = 2
+          position = 0
+          bufferPosition = 0
+          finished = true
         }
-        position = 0
-        bufferPosition = 0
-        finished = true
+        eventSink?.success(mapOf("event" to "finished"))
       }
-      eventSink?.success(mapOf("event" to "finished"))
     }
     mediaPlayer.setOnErrorListener { _, what, extra ->
       if (state != 0) {

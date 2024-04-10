@@ -250,7 +250,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		if avPlayer.currentTime() == pos {
 			eventSink?(["event": "seekEnd"])
 		} else {
-			avPlayer.seek(to: pos, toleranceBefore: .zero, toleranceAfter: .zero) {[weak self] finished in
+			avPlayer.seek(to: pos, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
 				if finished && self != nil {
 					self!.eventSink?(["event": "seekEnd"])
 					if self!.watcher == nil {
@@ -305,20 +305,22 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
   }
 	
 	@objc private func onFinish(notification: NSNotification) {
-	  avPlayer.seek(to: .zero) {[weak self] finished in
-			if self != nil {
-				if self!.looping && self!.state == 3 {
-					self!.play()
-				} else if finished {
-					if self!.state == 3 {
+		if state == 3 {
+			avPlayer.seek(to: .zero) { [weak self] finished in
+				if self != nil {
+					if self!.looping {
+						self!.play()
+					} else {
 						self!.state = 2
+						if finished {
+							self!.position = .zero
+							self!.bufferPosition = .zero
+						}
 					}
-					self!.position = .zero
-					self!.bufferPosition = .zero
+					self!.eventSink?(["event": "finished"])
 				}
-				self!.eventSink?(["event": "finished"])
 			}
-	  }
+		}
   }
 
   func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {

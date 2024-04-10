@@ -24,10 +24,8 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
     _player.loading.addListener(() => setState(() {}));
     _player.looping.addListener(() => setState(() {}));
     _player.autoPlay.addListener(() => setState(() {}));
-    _player.error
-        .addListener(() => debugPrint('error: ${_player.error.value}'));
-    _player.bufferRange.addListener(() => debugPrint(
-        'pos: ${_player.position.value} buffer begin: ${_player.bufferRange.value.begin} buffer end: ${_player.bufferRange.value.end}'));
+    _player.error.addListener(() => debugPrint('error: ${_player.error.value}'));
+    _player.bufferRange.addListener(() => debugPrint('pos: ${_player.position.value} buffer begin: ${_player.bufferRange.value.begin} buffer end: ${_player.bufferRange.value.end}'));
   }
 
   @override
@@ -46,21 +44,18 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
               padding: const EdgeInsets.all(16),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                // mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Checkbox(
                         value: _player.autoPlay.value,
-                        onChanged: (value) =>
-                            _player.setAutoPlay(value ?? false),
+                        onChanged: (value) => _player.setAutoPlay(value ?? false),
                       ),
                       const Text('Autoplay'),
                       const Spacer(),
                       Checkbox(
                         value: _player.looping.value,
-                        onChanged: (value) =>
-                            _player.setLooping(value ?? false),
+                        onChanged: (value) => _player.setLooping(value ?? false),
                       ),
                       const Text('Playback loop'),
                     ],
@@ -76,9 +71,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                           backgroundColor: Colors.black,
                           initSource: videoSources.first.path,
                         ),
-                        if (_player.mediaInfo.value != null &&
-                            (_player.mediaInfo.value!.width == 0 ||
-                                _player.mediaInfo.value!.height == 0))
+                        if (_player.mediaInfo.value != null && (_player.mediaInfo.value!.width == 0 || _player.mediaInfo.value!.height == 0))
                           const Text(
                             'Audio only',
                             style: TextStyle(
@@ -86,8 +79,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                               fontSize: 24,
                             ),
                           ),
-                        if (_player.loading.value)
-                          const CircularProgressIndicator(),
+                        if (_player.loading.value) const CircularProgressIndicator(),
                       ],
                     ),
                   ),
@@ -108,9 +100,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                       const Spacer(),
                       Text(
                         formatDuration(
-                          Duration(
-                              milliseconds:
-                                  _player.mediaInfo.value?.duration ?? 0),
+                          Duration(milliseconds: _player.mediaInfo.value?.duration ?? 0),
                         ),
                       ),
                     ],
@@ -132,14 +122,11 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.fast_rewind),
-                        onPressed: () => _player
-                            .seekTo(max(_player.position.value - 5000, 0)),
+                        onPressed: () => _player.seekTo(max(_player.position.value - 5000, 0)),
                       ),
                       IconButton(
                         icon: const Icon(Icons.fast_forward),
-                        onPressed: () => _player.seekTo(min(
-                            _player.position.value + 5000,
-                            _player.mediaInfo.value?.duration ?? 0)),
+                        onPressed: () => _player.seekTo(min(_player.position.value + 5000, _player.mediaInfo.value?.duration ?? 0)),
                       ),
                       const Spacer(),
                       _buildPlaybackStatusView(),
@@ -147,8 +134,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                   ),
                   Row(
                     children: [
-                      Text(
-                          'Volume: ${_player.volume.value.toStringAsFixed(2)}'),
+                      Text('Volume: ${_player.volume.value.toStringAsFixed(2)}'),
                       Expanded(
                         child: Slider(
                           value: _player.volume.value,
@@ -191,8 +177,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                     ),
                   ),
                 ),
-                separatorBuilder: (BuildContext context, int index) =>
-                    const SizedBox(width: 8),
+                separatorBuilder: (BuildContext context, int index) => const SizedBox(width: 8),
               ),
             ),
             const SizedBox(height: 16),

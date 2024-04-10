@@ -26,8 +26,7 @@ final videoSources = [
     type: VideoSourceType.network,
   ),
   ExampleVideoSource(
-    path:
-        'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4',
+    path: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4',
     type: VideoSourceType.network,
   ),
   ExampleVideoSource(

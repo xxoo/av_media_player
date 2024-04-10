@@ -1,3 +1,8 @@
+## 0.6.1
+
+- `seekTo` won't increase `finishedTimes` any more if the player is not in `playing` state.
+- auto correct param values in `seekTo`, `setVolume` and `setSpeed` methods.
+
 ## 0.6.0
 
 - fix type mismatch issue in android seekTo method.
