@@ -1,3 +1,7 @@
+## 0.6.3
+
+- minor fixes.
+
 ## 0.6.2
 
 - fix code formatting issues.

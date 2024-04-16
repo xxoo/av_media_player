@@ -24,7 +24,7 @@ class _MyAppState extends State<MyApp> {
             children: [
               AVMediaView(
                 initSource:
-                    'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
+                    'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
                 initLooping: true,
                 initAutoPlay: true,
                 onCreated: (player) {

@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'av_media_player'
-  s.version          = '0.5.1'
+  s.version          = '0.6.3'
   s.summary          = 'A lightweight media player for flutter.'
   s.description      = <<-DESC
 A lightweight media player for flutter. Which uses Texture Widget for video rendering. Backend builts on AVPlayer(ios/macos) and MediaPlayer(Android).

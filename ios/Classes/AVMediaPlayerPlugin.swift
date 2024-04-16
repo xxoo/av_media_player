@@ -29,6 +29,13 @@ public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
     super.init()
   }
 
+	public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+		for player in players.values {
+			player.close()
+		}
+		players.removeAll()
+	}
+
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "create":

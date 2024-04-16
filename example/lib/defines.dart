@@ -15,19 +15,37 @@ class ExampleVideoSource {
 }
 
 final videoSources = [
-  ExampleVideoSource(path: 'assets/01.mp4', type: VideoSourceType.asset),
-  ExampleVideoSource(path: 'assets/02.mp4', type: VideoSourceType.asset),
-  ExampleVideoSource(path: 'assets/03.mp4', type: VideoSourceType.asset),
-  ExampleVideoSource(path: 'assets/04.mp4', type: VideoSourceType.asset),
-  ExampleVideoSource(path: 'assets/05.mp4', type: VideoSourceType.asset),
-  ExampleVideoSource(path: 'assets/06.mp4', type: VideoSourceType.asset),
+  ExampleVideoSource(
+    path: 'assets/01.mp4',
+    type: VideoSourceType.asset,
+  ),
+  ExampleVideoSource(
+    path: 'assets/02.mp4',
+    type: VideoSourceType.asset,
+  ),
+  ExampleVideoSource(
+    path: 'assets/03.mp4',
+    type: VideoSourceType.asset,
+  ),
+  ExampleVideoSource(
+    path: 'assets/04.mp4',
+    type: VideoSourceType.asset,
+  ),
+  ExampleVideoSource(
+    path: 'assets/05.mp4',
+    type: VideoSourceType.asset,
+  ),
+  ExampleVideoSource(
+    path: 'assets/06.mp4',
+    type: VideoSourceType.asset,
+  ),
   ExampleVideoSource(
     path: 'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4',
     type: VideoSourceType.network,
   ),
   ExampleVideoSource(
     path:
-        'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_30MB.mp4',
+        'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
     type: VideoSourceType.network,
   ),
   ExampleVideoSource(
@@ -36,6 +54,7 @@ final videoSources = [
   ),
 ];
 
+// copy asset to cache directory
 Future<String> loadAssetFile(String assetPath) async {
   final cacheDirectory = Directory.systemTemp;
   final cachedFilePath = '${cacheDirectory.path}/$assetPath';
