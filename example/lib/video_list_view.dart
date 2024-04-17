@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:av_media_player/index.dart';
+import 'package:av_media_player/player.dart';
+import 'package:av_media_player/utils.dart';
 import 'package:inview_notifier_list/inview_notifier_list.dart';
 import 'defines.dart';
 
@@ -10,12 +11,11 @@ class VideoListView extends StatefulWidget {
   State<StatefulWidget> createState() => _VideoListView();
 }
 
-class _VideoListView extends State<VideoListView> with SetStateSafely {
+class _VideoListView extends State<VideoListView> with SetStateAsync {
   final _players = <AVMediaPlayer>[];
   @override
   void initState() {
     super.initState();
-
     for (var i = 0; i < videoSources.length; i++) {
       final player = AVMediaPlayer(initLooping: true);
       player.mediaInfo.addListener(() => setState(() {}));
@@ -26,7 +26,7 @@ class _VideoListView extends State<VideoListView> with SetStateSafely {
 
   @override
   void dispose() {
-    //you should dispose all the players. cause they are managed by the user.
+    //We should dispose all the players. cause they are managed by the user.
     for (final player in _players) {
       player.dispose();
     }
@@ -52,10 +52,14 @@ class _VideoListView extends State<VideoListView> with SetStateSafely {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  AVMediaView(
-                    initPlayer: _players[index],
-                    backgroundColor: Colors.black,
-                  ),
+                  // We can use Texture widget instead of AVPlayerView to display video.
+                  // But we have to make sure the player is initialized before doing that. (_players[index].id.value != null)
+                  // In this case we check _players[index].mediaInfo.value != null which also guarantees that the player is initialized.
+                  _players[index].mediaInfo.value == null ||
+                          _players[index].mediaInfo.value!.width == 0 ||
+                          _players[index].mediaInfo.value!.height == 0
+                      ? Container(color: Colors.black)
+                      : Texture(textureId: _players[index].id.value!),
                   if (_players[index].mediaInfo.value != null &&
                       (_players[index].mediaInfo.value!.width == 0 ||
                           _players[index].mediaInfo.value!.height == 0))

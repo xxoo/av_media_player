@@ -108,14 +108,11 @@ public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
 class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 #if os(macOS)
 	private var displayLink: CVDisplayLink?
-	func displayCallback(now: UInt64, outputTime: UInt64) {
+	func displayCallback(outputTime: CVTimeStamp) {
 		if output != nil && displayLink != nil {
-			let d = Int64(Double(outputTime - now) * Double(avPlayer.rate))
-			let t = output!.itemTime(forMachAbsoluteTime: Int64(now) + d)
+			let t = output!.itemTime(for: outputTime)
 			if reading != t && output!.hasNewPixelBuffer(forItemTime: t) {
-				if reading == nil {
-					textureRegistry.textureFrameAvailable(id)
-				}
+				textureRegistry.textureFrameAvailable(id)
 				reading = t
 			}
 		}
@@ -124,12 +121,9 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	private var displayLink: CADisplayLink?
 	@objc private func displayCallback() {
 		if output != nil && displayLink != nil {
-			let c = CACurrentMediaTime()
-			let t = output!.itemTime(forHostTime: c + (displayLink!.targetTimestamp - c) * Double(avPlayer.rate))
+			let t = output!.itemTime(forHostTime: displayLink!.targetTimestamp)
 			if reading != t && output!.hasNewPixelBuffer(forItemTime: t) {
-				if reading == nil {
-					textureRegistry.textureFrameAvailable(id)
-				}
+				textureRegistry.textureFrameAvailable(id)
 				reading = t
 			}
 		}
@@ -358,7 +352,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 						if displayLink != nil {
 							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
 								let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
-								player.displayCallback(now: now.pointee.hostTime, outputTime: outputTime.pointee.hostTime)
+								player.displayCallback(outputTime: outputTime.pointee)
 								return kCVReturnSuccess
 							}, Unmanaged.passUnretained(self).toOpaque())
 							CVDisplayLinkStart(displayLink!)

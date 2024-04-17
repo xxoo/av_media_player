@@ -1,3 +1,3 @@
 export 'player.dart';
-export 'types.dart';
 export 'widget.dart';
+export 'utils.dart';

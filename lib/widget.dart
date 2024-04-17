@@ -1,6 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'player.dart';
-import 'types.dart';
+import 'utils.dart';
+
+/// This type is used by [AVMediaView], for sizing the video.
+enum SizingMode { free, keepAspectRatio, originalSize }
 
 /// The widget to display video for [AVMediaPlayer].
 class AVMediaView extends StatefulWidget {
@@ -45,7 +48,7 @@ class AVMediaView extends StatefulWidget {
   State<AVMediaView> createState() => _AVMediaState();
 }
 
-class _AVMediaState extends State<AVMediaView> with SetStateSafely {
+class _AVMediaState extends State<AVMediaView> with SetStateAsync {
   bool _foreignPlayer = false;
   AVMediaPlayer? _player;
 
@@ -106,11 +109,6 @@ class _AVMediaState extends State<AVMediaView> with SetStateSafely {
     if (_foreignPlayer) {
       try {
         _player?.mediaInfo.removeListener(_update);
-        //maybe the player will be reused by the user.
-        //but at least it should be closed to prevent texture link error if there is an open video.
-        if (_hasVideo()) {
-          _player!.close();
-        }
       } catch (_) {}
     } else {
       _player?.dispose();

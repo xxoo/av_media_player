@@ -1,3 +1,8 @@
+## 0.6.4
+
+- fixed a bug may cause video freeze on ios/macos.
+- **breaking change:** replace `SetStateSafely` mixin with `SetStateAsync`.
+
 ## 0.6.3
 
 - minor fixes.
@@ -25,7 +30,7 @@
 
 ## 0.5.7
 
-- breaking change: remove `keepAspectRatio` property from `AVMediaView` widget and add `sizingMode` property instead.
+- **breaking change:** remove `keepAspectRatio` property from `AVMediaView` widget and add `sizingMode` property instead.
 
 ## 0.5.6
 

@@ -1,7 +1,27 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'types.dart';
+
+/// This type is used by [AVMediaPlayer], for showing current playback state.
+enum PlaybackState { playing, paused, closed }
+
+/// This type is used by [AVMediaPlayer], for showing current buffer status.
+class BufferRange {
+  static const empty = BufferRange(0, 0);
+
+  final int begin;
+  final int end;
+  const BufferRange(this.begin, this.end);
+}
+
+/// This type is used by [AVMediaPlayer], for showing current media info.
+class MediaInfo {
+  final int width;
+  final int height;
+  final int duration;
+  final String source;
+  const MediaInfo(this.width, this.height, this.duration, this.source);
+}
 
 /// The class to create and control [AVMediaPlayer] instance.
 ///
@@ -83,12 +103,8 @@ class AVMediaPlayer {
           if (_source == e['source']) {
             loading.value = false;
             playbackState.value = PlaybackState.paused;
-            mediaInfo.value = MediaInfo(
-              e['width'],
-              e['height'],
-              e['duration'],
-              _source!,
-            );
+            mediaInfo.value =
+                MediaInfo(e['width'], e['height'], e['duration'], _source!);
             if (autoPlay.value) {
               play();
             }
@@ -147,15 +163,22 @@ class AVMediaPlayer {
         open(_source!);
       }
       if (volume.value != 1) {
-        _methodChannel
-            .invokeMethod('setVolume', {'id': value, 'value': volume.value});
+        _methodChannel.invokeMethod('setVolume', {
+          'id': value,
+          'value': volume.value,
+        });
       }
       if (speed.value != 1) {
-        _methodChannel
-            .invokeMethod('setSpeed', {'id': value, 'value': speed.value});
+        _methodChannel.invokeMethod('setSpeed', {
+          'id': value,
+          'value': speed.value,
+        });
       }
       if (looping.value) {
-        _methodChannel.invokeMethod('setLooping', {'id': value, 'value': true});
+        _methodChannel.invokeMethod('setLooping', {
+          'id': value,
+          'value': true,
+        });
       }
     });
     _position = initPosition;
@@ -205,7 +228,10 @@ class AVMediaPlayer {
       bufferRange.value = BufferRange.empty;
       finishedTimes.value = 0;
       playbackState.value = PlaybackState.closed;
-      _methodChannel.invokeMethod('open', {'id': id.value, 'value': source});
+      _methodChannel.invokeMethod('open', {
+        'id': id.value,
+        'value': source,
+      });
     }
     loading.value = true;
   }
@@ -274,8 +300,10 @@ class AVMediaPlayer {
       } else if (position > mediaInfo.value!.duration) {
         position = mediaInfo.value!.duration;
       }
-      _methodChannel
-          .invokeMethod('seekTo', {'id': id.value, 'value': position});
+      _methodChannel.invokeMethod('seekTo', {
+        'id': id.value,
+        'value': position,
+      });
       loading.value = true;
       _seeked = true;
       return true;
@@ -293,8 +321,10 @@ class AVMediaPlayer {
       volume = 1;
     }
     if (this.volume.value != volume) {
-      _methodChannel
-          .invokeMethod('setVolume', {'id': id.value, 'value': volume});
+      _methodChannel.invokeMethod('setVolume', {
+        'id': id.value,
+        'value': volume,
+      });
       this.volume.value = volume;
       return true;
     }
@@ -312,8 +342,10 @@ class AVMediaPlayer {
     }
     if (this.speed.value != speed) {
       if (id.value != null) {
-        _methodChannel
-            .invokeMethod('setSpeed', {'id': id.value, 'value': speed});
+        _methodChannel.invokeMethod('setSpeed', {
+          'id': id.value,
+          'value': speed,
+        });
       }
       this.speed.value = speed;
       return true;
@@ -325,8 +357,10 @@ class AVMediaPlayer {
   bool setLooping(bool looping) {
     if (looping != this.looping.value) {
       if (id.value != null) {
-        _methodChannel
-            .invokeMethod('setLooping', {'id': id.value, 'value': looping});
+        _methodChannel.invokeMethod('setLooping', {
+          'id': id.value,
+          'value': looping,
+        });
       }
       this.looping.value = looping;
       return true;

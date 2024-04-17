@@ -10,7 +10,7 @@ class VideoPlayerView extends StatefulWidget {
   State<VideoPlayerView> createState() => _VideoPlayerViewState();
 }
 
-class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
+class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
   final AVMediaPlayer _player = AVMediaPlayer();
 
   @override
@@ -24,15 +24,22 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
     _player.loading.addListener(() => setState(() {}));
     _player.looping.addListener(() => setState(() {}));
     _player.autoPlay.addListener(() => setState(() {}));
-    _player.error
-        .addListener(() => debugPrint('error: ${_player.error.value}'));
-    _player.bufferRange.addListener(() => debugPrint(
-        'pos: ${_player.position.value} buffer begin: ${_player.bufferRange.value.begin} buffer end: ${_player.bufferRange.value.end}'));
+    _player.error.addListener(() {
+      if (_player.error.value != null) {
+        debugPrint('Error: ${_player.error.value}');
+      }
+    });
+    _player.bufferRange.addListener(() {
+      if (_player.bufferRange.value != BufferRange.empty) {
+        debugPrint(
+            'pos: ${_player.position.value} buffer begin: ${_player.bufferRange.value.begin} buffer end: ${_player.bufferRange.value.end}');
+      }
+    });
   }
 
   @override
   void dispose() {
-    //you should dispose this player. cause it's managed by the user.
+    //We should dispose this player. cause it's managed by the user.
     _player.dispose();
     super.dispose();
   }
@@ -187,6 +194,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateSafely {
                     child: AVMediaView(
                       initSource: videoSources[index].path,
                       backgroundColor: Colors.black,
+                      sizingMode: SizingMode.free,
                     ),
                   ),
                 ),
