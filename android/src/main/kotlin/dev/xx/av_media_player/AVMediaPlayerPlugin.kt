@@ -123,7 +123,7 @@ class AVMediaPlayer(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.
         mediaPlayer.setSurface(surface)
       }
       mediaPlayer.setVolume(volume, volume)
-      //to ensure the first frame is rendered
+      //to ensure the first frame is loaded
       mediaPlayer.seekTo(0)
       stillPreparing = true
     }

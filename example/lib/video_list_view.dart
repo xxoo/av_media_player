@@ -13,6 +13,7 @@ class VideoListView extends StatefulWidget {
 
 class _VideoListView extends State<VideoListView> with SetStateAsync {
   final _players = <AVMediaPlayer>[];
+
   @override
   void initState() {
     super.initState();
@@ -77,16 +78,15 @@ class _VideoListView extends State<VideoListView> with SetStateAsync {
             ),
           ),
           builder: (context, isInView, child) {
-            if (!isInView) {
-              _players[index].pause();
-              _players[index].setAutoPlay(false);
-            } else if (_players[index].mediaInfo.value != null) {
-              _players[index].play();
-            } else {
-              if (!_players[index].loading.value) {
+            if (isInView) {
+              // We should open the video only if it's not already opened and not loading.
+              if (_players[index].mediaInfo.value == null &&
+                  !_players[index].loading.value) {
                 _players[index].open(videoSources[index].path);
               }
-              _players[index].setAutoPlay(true);
+              _players[index].play();
+            } else {
+              _players[index].pause();
             }
             return child!;
           },

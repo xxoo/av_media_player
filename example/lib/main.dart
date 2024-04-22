@@ -15,26 +15,19 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        home: Scaffold(
-          appBar: AppBar(
-            title: const Text('av_media_player simple example'),
-          ),
-          body: SizedBox.expand(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                AVMediaView(
-                  initSource:
-                      'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
-                  initLooping: true,
-                  initAutoPlay: true,
-                  onCreated: (player) => player.loading.addListener(
-                      () => setState(() => _loading = player.loading.value)),
-                ),
-                if (_loading) const CircularProgressIndicator(),
-              ],
+        home: Stack(
+          alignment: Alignment.center,
+          children: [
+            AVMediaView(
+              initSource:
+                  'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
+              initLooping: true,
+              initAutoPlay: true,
+              onCreated: (player) => player.loading.addListener(
+                  () => setState(() => _loading = player.loading.value)),
             ),
-          ),
+            if (_loading) const CircularProgressIndicator(),
+          ],
         ),
       );
 }

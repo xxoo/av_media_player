@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:av_media_player/index.dart';
 import 'defines.dart';
@@ -107,17 +106,14 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                   Row(
                     children: [
                       Text(
-                        formatDuration(
-                          Duration(milliseconds: _player.position.value),
-                        ),
+                        _formatDuration(
+                            Duration(milliseconds: _player.position.value)),
                       ),
                       const Spacer(),
                       Text(
-                        formatDuration(
-                          Duration(
-                              milliseconds:
-                                  _player.mediaInfo.value?.duration ?? 0),
-                        ),
+                        _formatDuration(Duration(
+                            milliseconds:
+                                _player.mediaInfo.value?.duration ?? 0)),
                       ),
                     ],
                   ),
@@ -138,14 +134,13 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.fast_rewind),
-                        onPressed: () => _player
-                            .seekTo(max(_player.position.value - 5000, 0)),
+                        onPressed: () =>
+                            _player.seekTo(_player.position.value - 5000),
                       ),
                       IconButton(
                         icon: const Icon(Icons.fast_forward),
-                        onPressed: () => _player.seekTo(min(
-                            _player.position.value + 5000,
-                            _player.mediaInfo.value?.duration ?? 0)),
+                        onPressed: () =>
+                            _player.seekTo(_player.position.value + 5000),
                       ),
                       const Spacer(),
                       _buildPlaybackStatusView(),
@@ -209,20 +204,30 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
 
   Widget _buildPlaybackStatusView() {
     const size = 16.0;
-    final color = Colors.black.withOpacity(0.3);
+    const color = Color(0x80000000);
     switch (_player.playbackState.value) {
       case PlaybackState.playing:
-        return Icon(Icons.play_arrow, size: size, color: color);
+        return const Icon(
+          Icons.play_arrow,
+          size: size,
+          color: color,
+        );
       case PlaybackState.paused:
-        return Icon(Icons.pause, size: size, color: color);
+        return const Icon(
+          Icons.pause,
+          size: size,
+          color: color,
+        );
       case PlaybackState.closed:
-        return Icon(Icons.stop, size: size, color: color);
-      default:
-        return Container();
+        return const Icon(
+          Icons.stop,
+          size: size,
+          color: color,
+        );
     }
   }
 
-  String formatDuration(Duration duration) {
+  String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
     final twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));

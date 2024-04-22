@@ -1,3 +1,7 @@
+## 0.6.5
+
+- make sure the first frame is loaded before receiving `mediaInfo` in ios/macos.
+
 ## 0.6.4
 
 - fixed a bug may cause video freeze on ios/macos.

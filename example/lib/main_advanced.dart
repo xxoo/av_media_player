@@ -38,7 +38,7 @@ class _AppViewState extends State<AppView> {
           ),
           body: _buildBodyView(),
           bottomNavigationBar: BottomNavigationBar(
-            items: const <BottomNavigationBarItem>[
+            items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.smart_display),
                 label: 'Video Player',

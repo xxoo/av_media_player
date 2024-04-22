@@ -339,38 +339,41 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		case #keyPath(AVPlayer.currentItem.status):
 			switch avPlayer.currentItem?.status {
 			case .readyToPlay:
-				if let currentItem = avPlayer.currentItem,
-					source != nil {
-					let width = Int(currentItem.presentationSize.width)
-					let height = Int(currentItem.presentationSize.height)
-					let duration = Int(currentItem.duration.seconds * 1000)
-					if width > 0 && height > 0 && duration > 0 {
-						output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
-						currentItem.add(output!)
+				//to ensure the first frame is loaded
+				avPlayer.seek(to: .zero) { [weak self] finished in
+					if self != nil && self!.source != nil,
+						let currentItem = self!.avPlayer.currentItem {
+						let width = Int(currentItem.presentationSize.width)
+						let height = Int(currentItem.presentationSize.height)
+						let duration = Int(currentItem.duration.seconds * 1000)
+						if width > 0 && height > 0 && duration > 0 {
+							self!.output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
+							currentItem.add(self!.output!)
 #if os(macOS)
-						CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-						if displayLink != nil {
-							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
-								let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
-								player.displayCallback(outputTime: outputTime.pointee)
-								return kCVReturnSuccess
-							}, Unmanaged.passUnretained(self).toOpaque())
-							CVDisplayLinkStart(displayLink!)
-						}
+							CVDisplayLinkCreateWithActiveCGDisplays(&self!.displayLink)
+							if self!.displayLink != nil {
+								CVDisplayLinkSetOutputCallback(self!.displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
+									let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
+									player.displayCallback(outputTime: outputTime.pointee)
+									return kCVReturnSuccess
+								}, Unmanaged.passUnretained(self!).toOpaque())
+								CVDisplayLinkStart(self!.displayLink!)
+							}
 #else
-						displayLink = CADisplayLink(target: self, selector: #selector(displayCallback))
-						displayLink!.add(to: .current, forMode: .common)
+							self!.displayLink = CADisplayLink(target: self!, selector: #selector(self!.displayCallback))
+							self!.displayLink!.add(to: .current, forMode: .common)
 #endif
+						}
+						self!.avPlayer.volume = self!.volume
+						self!.state = 2
+						self!.eventSink?([
+							"event": "mediaInfo",
+							"duration": duration,
+							"width": width,
+							"height": height,
+							"source": self!.source!
+						])
 					}
-					avPlayer.volume = volume
-					state = 2
-					eventSink?([
-						"event": "mediaInfo",
-						"duration": duration,
-						"width": width,
-						"height": height,
-						"source": source!
-					])
 				}
 			case .failed:
 				if state != 0 {
