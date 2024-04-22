@@ -1,3 +1,7 @@
+## 0.6.6
+
+- dispose all native `AVMediaPlayer` instances while flutter engine is restarting. (Android only)
+
 ## 0.6.5
 
 - make sure the first frame is loaded before receiving `mediaInfo` in ios/macos.

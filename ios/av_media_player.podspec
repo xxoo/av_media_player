@@ -4,10 +4,10 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'av_media_player'
-  s.version          = '0.6.5'
+  s.version          = '0.6.6'
   s.summary          = 'A lightweight media player for flutter.'
   s.description      = <<-DESC
-A lightweight media player for flutter. Which uses Texture Widget for video rendering. Backend builts on AVPlayer(ios/macos) and MediaPlayer(Android).
+A lightweight media player for flutter. Which uses Texture Widget for video rendering. Backend builds on AVPlayer(ios/macos) and MediaPlayer(Android).
                        DESC
   s.homepage         = 'http://github.com/xxoo/av_media_player'
   s.license          = { :file => '../LICENSE' }

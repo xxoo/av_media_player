@@ -1,5 +1,6 @@
 package dev.xx.av_media_player
 
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -10,23 +11,32 @@ import android.os.Handler
 import android.os.Looper
 import kotlin.math.max
 
-class AVMediaPlayerPlugin: FlutterPlugin, MethodChannel.MethodCallHandler {
+class AVMediaPlayerPlugin: FlutterPlugin, MethodChannel.MethodCallHandler, FlutterEngine.EngineLifecycleListener {
   private lateinit var binding: FlutterPlugin.FlutterPluginBinding
   private lateinit var methodChannel: MethodChannel
   private val players = mutableMapOf<Long, AVMediaPlayer>()
 
+  override fun onEngineWillDestroy() {
+    for (player in players.values) {
+      player.dispose()
+    }
+    players.clear()
+  }
+
+  override fun onPreEngineRestart() {
+    onEngineWillDestroy()
+  }
+
   override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     binding = flutterPluginBinding
+    binding.flutterEngine.addEngineLifecycleListener(this)
     methodChannel = MethodChannel(binding.binaryMessenger, "avMediaPlayer")
     methodChannel.setMethodCallHandler(this)
   }
 
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     methodChannel.setMethodCallHandler(null)
-    for (player in players.values) {
-      player.dispose()
-    }
-    players.clear()
+    onEngineWillDestroy()
   }
 
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
