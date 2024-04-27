@@ -6,28 +6,25 @@ import Flutter
 #endif
 
 public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
-  public static func register(with registrar: FlutterPluginRegistrar) {
+	public static func register(with registrar: FlutterPluginRegistrar) {
 #if os(macOS)
 		let messager = registrar.messenger
 #else
 		let messager = registrar.messenger()
 #endif
-    registrar.addMethodCallDelegate(
-      AVMediaPlayerPlugin(registrar: registrar),
-      channel: FlutterMethodChannel(
-				name: "avMediaPlayer",
-				binaryMessenger: messager
-			)
-    )
-  }
+		registrar.addMethodCallDelegate(
+			AVMediaPlayerPlugin(registrar: registrar),
+			channel: FlutterMethodChannel(name: "avMediaPlayer", binaryMessenger: messager)
+		)
+	}
 
-  private var players: [Int64: AVMediaPlayer] = [:]
-  private let registrar: FlutterPluginRegistrar
+	private var players: [Int64: AVMediaPlayer] = [:]
+	private let registrar: FlutterPluginRegistrar
 
-  init(registrar: FlutterPluginRegistrar) {
-    self.registrar = registrar
-    super.init()
-  }
+	init(registrar: FlutterPluginRegistrar) {
+		self.registrar = registrar
+		super.init()
+	}
 
 	public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
 		for player in players.values {
@@ -36,73 +33,73 @@ public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
 		players.removeAll()
 	}
 
-  public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    switch call.method {
-    case "create":
-      let player = AVMediaPlayer(registrar: registrar)
-      players[player.id] = player
-      result(player.id)
-    case "dispose":
-      result(nil)
-      if let id = call.arguments as? Int64,
+	public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+		switch call.method {
+		case "create":
+			let player = AVMediaPlayer(registrar: registrar)
+			players[player.id] = player
+			result(player.id)
+		case "dispose":
+			result(nil)
+			if let id = call.arguments as? Int64,
 				let player = players[id] {
 				player.close()
-        players.removeValue(forKey: id)
-      }
-    case "open":
-      result(nil)
-      if let args = call.arguments as? [String: Any],
+				players.removeValue(forKey: id)
+			}
+		case "open":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
 				let id = args["id"] as? Int64,
 				let value = args["value"] as? String {
-        players[id]?.open(source: value)
-      }
-    case "close":
-      result(nil)
-      if let id = call.arguments as? Int64 {
-        players[id]?.close()
-      }
-    case "play":
-      result(nil)
-      if let id = call.arguments as? Int64 {
-        players[id]?.play()
-      }
-    case "pause":
-      result(nil)
-      if let id = call.arguments as? Int64 {
-        players[id]?.pause()
-      }
-    case "seekTo":
-      result(nil)
-      if let args = call.arguments as? [String: Any],
+				players[id]?.open(source: value)
+			}
+		case "close":
+			result(nil)
+			if let id = call.arguments as? Int64 {
+				players[id]?.close()
+			}
+		case "play":
+			result(nil)
+			if let id = call.arguments as? Int64 {
+				players[id]?.play()
+			}
+		case "pause":
+			result(nil)
+			if let id = call.arguments as? Int64 {
+				players[id]?.pause()
+			}
+		case "seekTo":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
 				let id = args["id"] as? Int64,
 				let value = args["value"] as? Double {
 				players[id]?.seekTo(pos: CMTime(seconds: value / 1000, preferredTimescale: 1000))
-      }
-    case "setVolume":
-      result(nil)
-      if let args = call.arguments as? [String: Any],
+			}
+		case "setVolume":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
 				let id = args["id"] as? Int64,
 				let value = args["value"] as? Float {
-        players[id]?.setVolume(vol: value)
-      }
-    case "setSpeed":
-      result(nil)
-      if let args = call.arguments as? [String: Any],
+				players[id]?.setVolume(vol: value)
+			}
+		case "setSpeed":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
 				let id = args["id"] as? Int64,
 				let value = args["value"] as? Float {
-        players[id]?.setSpeed(spd: value)
-      }
-    case "setLooping":
-      result(nil)
-      if let args = call.arguments as? [String: Any],
+				players[id]?.setSpeed(spd: value)
+			}
+		case "setLooping":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
 				let id = args["id"] as? Int64,
 				let value = args["value"] as? Bool {
-        players[id]?.setLooping(loop: value)
-      }
-    default:
-      result(FlutterMethodNotImplemented)
-    }
-  }
+				players[id]?.setLooping(loop: value)
+			}
+		default:
+			result(FlutterMethodNotImplemented)
+		}
+	}
 }
 
 class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
@@ -130,26 +127,26 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	}
 #endif
 
-  private let textureRegistry: FlutterTextureRegistry
-  private let avPlayer = AVPlayer()
+	private let textureRegistry: FlutterTextureRegistry
+	private let avPlayer = AVPlayer()
 
 	var id: Int64!
-  private var eventChannel: FlutterEventChannel!
+	private var eventChannel: FlutterEventChannel!
 
-  private var output: AVPlayerItemVideoOutput?
-  private var eventSink: FlutterEventSink?
+	private var output: AVPlayerItemVideoOutput?
+	private var eventSink: FlutterEventSink?
 	private var watcher: Any?
 	private var position = CMTime.zero
 	private var bufferPosition = CMTime.zero
-  private var speed: Float = 1
-  private var volume: Float = 1
-  private var looping = false
+	private var speed: Float = 1
+	private var volume: Float = 1
+	private var looping = false
 	private var reading: CMTime?
-  //0: idle, 1: opening, 2: ready, 3: playing
+	//0: idle, 1: opening, 2: ready, 3: playing
 	private var state = 0
 	private var source: String?
 
-  init(registrar: FlutterPluginRegistrar) {
+	init(registrar: FlutterPluginRegistrar) {
 #if os(macOS)
 		textureRegistry = registrar.textures
 		let messager = registrar.messenger
@@ -160,40 +157,43 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		super.init()
 		id = textureRegistry.register(self)
 		eventChannel = FlutterEventChannel(name: "avMediaPlayer/\(id!)", binaryMessenger: messager)
-    eventChannel.setStreamHandler(self)
+		eventChannel.setStreamHandler(self)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus), options: .old, context: nil)
-    avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
+		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.loadedTimeRanges), context: nil)
-  }
+	}
 
-  deinit {
-    eventSink?(FlutterEndOfEventStream)
-    eventChannel.setStreamHandler(nil)
-    avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus))
-    avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status))
+	deinit {
+		eventSink?(FlutterEndOfEventStream)
+		eventChannel.setStreamHandler(nil)
+		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus))
+		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status))
 		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.loadedTimeRanges))
 		textureRegistry.unregisterTexture(id)
-  }
+	}
 
-  func open(source: String) {
-    let uri = source.contains("://") ? URL(string: source) : URL(fileURLWithPath: source)
-    if uri == nil {
-      eventSink?(["event": "error", "value": "Invalid path"])
-    } else {
-      close()
+	func open(source: String) {
+		let uri = source.contains("://") ? URL(string: source) : URL(fileURLWithPath: source)
+		if uri == nil {
+			eventSink?([
+				"event": "error",
+				"value": "Invalid path"
+			])
+		} else {
+			close()
 			self.source = source
 			state = 1
-      avPlayer.replaceCurrentItem(with: AVPlayerItem(asset: AVAsset(url: uri!)))
-      NotificationCenter.default.addObserver(
-        self,
-        selector: #selector(onFinish(notification:)),
-        name: .AVPlayerItemDidPlayToEndTime,
-        object: avPlayer.currentItem
-      )
-    }
-  }
+			avPlayer.replaceCurrentItem(with: AVPlayerItem(asset: AVAsset(url: uri!)))
+			NotificationCenter.default.addObserver(
+				self,
+				selector: #selector(onFinish(notification:)),
+				name: .AVPlayerItemDidPlayToEndTime,
+				object: avPlayer.currentItem
+			)
+		}
+	}
 
-  func close() {
+	func close() {
 		state = 0
 		position = .zero
 		bufferPosition = .zero
@@ -221,9 +221,9 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			)
 			avPlayer.replaceCurrentItem(with: nil)
 		}
-  }
+	}
 
-  func play() {
+	func play() {
 		if state > 1 {
 			state = 3
 			if watcher == nil {
@@ -236,18 +236,18 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 					}
 				}
 			}
-		  avPlayer.rate = speed
+			avPlayer.rate = speed
 		}
-  }
+	}
 
-  func pause() {
+	func pause() {
 		if state == 3 {
 			state = 2
-    	avPlayer.pause()
+			avPlayer.pause()
 		}
-  }
+	}
 
-  func seekTo(pos: CMTime) {
+	func seekTo(pos: CMTime) {
 		if avPlayer.currentTime() == pos {
 			eventSink?(["event": "seekEnd"])
 		} else {
@@ -260,39 +260,42 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 				}
 			}
 		}
-  }
+	}
 
-  func setVolume(vol: Float) {
-    volume = vol
-    avPlayer.volume = volume
-  }
+	func setVolume(vol: Float) {
+		volume = vol
+		avPlayer.volume = volume
+	}
 
-  func setSpeed(spd: Float) {
-    speed = spd
-    if avPlayer.rate > 0 {
-      avPlayer.rate = speed
-    }
-  }
+	func setSpeed(spd: Float) {
+		speed = spd
+		if avPlayer.rate > 0 {
+			avPlayer.rate = speed
+		}
+	}
 
-  func setLooping(loop: Bool) {
-    looping = loop
-  }
+	func setLooping(loop: Bool) {
+		looping = loop
+	}
 	
 	private func stopWatcher() {
-	  if watcher != nil {
-		  avPlayer.removeTimeObserver(watcher!)
-		  watcher = nil
-	  }
+		if watcher != nil {
+			avPlayer.removeTimeObserver(watcher!)
+			watcher = nil
+		}
 	}
 	
 	private func setPosition(time: CMTime) {
 		if time != position {
 			position = time
-			eventSink?(["event": "position", "value": Int(position.seconds * 1000)])
+			eventSink?([
+				"event": "position",
+				"value": Int(position.seconds * 1000)
+			])
 		}
 	}
 	
-  func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
+	func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
 		if let t = reading {
 			reading = nil
 			if let buffer = output?.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: nil) {
@@ -303,7 +306,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		} else {
 			return nil
 		}
-  }
+	}
 	
 	@objc private func onFinish(notification: NSNotification) {
 		if state == 3 {
@@ -322,19 +325,19 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 				}
 			}
 		}
-  }
+	}
 
-  func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-    eventSink = events
+	func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+		eventSink = events
 		return nil
-  }
+	}
 
-  func onCancel(withArguments arguments: Any?) -> FlutterError? {
-    eventSink = nil
+	func onCancel(withArguments arguments: Any?) -> FlutterError? {
+		eventSink = nil
 		return nil
-  }
+	}
 
-  override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
+	override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
 		switch keyPath {
 		case #keyPath(AVPlayer.currentItem.status):
 			switch avPlayer.currentItem?.status {
@@ -377,7 +380,10 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 				}
 			case .failed:
 				if state != 0 {
-					eventSink?(["event": "error", "value": avPlayer.currentItem?.error?.localizedDescription ?? "Unknown error"])
+					eventSink?([
+						"event": "error",
+						"value": avPlayer.currentItem?.error?.localizedDescription ?? "Unknown error"
+					])
 					close()
 				}
 			default:
@@ -385,19 +391,26 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			}
 		case #keyPath(AVPlayer.timeControlStatus):
 			if let oldValue = change?[NSKeyValueChangeKey.oldKey] as? Int,
-				 let oldStatus = AVPlayer.TimeControlStatus(rawValue: oldValue),
-				 oldStatus == .waitingToPlayAtSpecifiedRate || avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate {
-				eventSink?(["event": "loading", "value": avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate])
+				let oldStatus = AVPlayer.TimeControlStatus(rawValue: oldValue),
+				oldStatus == .waitingToPlayAtSpecifiedRate || avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate {
+				eventSink?([
+					"event": "loading",
+					"value": avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate
+				])
 			}
 		case #keyPath(AVPlayer.currentItem.loadedTimeRanges):
 			if let currentTime = avPlayer.currentItem?.currentTime(),
-				 let timeRanges = avPlayer.currentItem?.loadedTimeRanges as? [CMTimeRange] {
+				let timeRanges = avPlayer.currentItem?.loadedTimeRanges as? [CMTimeRange] {
 				for timeRange in timeRanges {
 					let end = timeRange.start + timeRange.duration
 					if timeRange.start <= currentTime && end >= currentTime {
 						if end != bufferPosition {
 							bufferPosition = end
-							eventSink?(["event": "bufferChange", "begin": Int(currentTime.seconds * 1000), "end": Int(bufferPosition.seconds * 1000)])
+							eventSink?([
+								"event": "bufferChange",
+								"begin": Int(currentTime.seconds * 1000),
+								"end": Int(bufferPosition.seconds * 1000)
+							])
 						}
 						break
 					}
@@ -406,5 +419,5 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		default:
 			break
 		}
-  }
+	}
 }
