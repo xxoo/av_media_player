@@ -2,18 +2,8 @@ import 'dart:core';
 import 'package:flutter/material.dart';
 import 'video_list_view.dart';
 import 'video_player_view.dart';
-import 'defines.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  for (final n in videoSources) {
-    if (n.type == VideoSourceType.asset) {
-      n.path = await loadAssetFile(n.path);
-      n.type = VideoSourceType.local;
-    }
-  }
-  runApp(const AppView());
-}
+void main() => runApp(const AppView());
 
 enum AppRoute {
   videoPlayer,

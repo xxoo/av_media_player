@@ -1,3 +1,9 @@
+## 0.6.7
+
+- support `asset://` scheme for local assets.
+- support realtime streaming playback(ios/macos: ll-hls, android: rtsp). a realtime stream should have a `duration` of 0.
+- **breaking change:** move `width` and `height` from `mediaInfo` to `videoSize` in `AVMediaPlayer` class as video size may change during playback.
+
 ## 0.6.6
 
 - dispose all native `AVMediaPlayer` instances while flutter engine is restarting. (Android only)

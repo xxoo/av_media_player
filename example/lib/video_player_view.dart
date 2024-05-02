@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:av_media_player/index.dart';
-import 'defines.dart';
+import 'sources.dart';
 
 class VideoPlayerView extends StatefulWidget {
   const VideoPlayerView({super.key});
@@ -20,6 +20,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
     _player.speed.addListener(() => setState(() {}));
     _player.volume.addListener(() => setState(() {}));
     _player.mediaInfo.addListener(() => setState(() {}));
+    _player.videoSize.addListener(() => setState(() {}));
     _player.loading.addListener(() => setState(() {}));
     _player.looping.addListener(() => setState(() {}));
     _player.autoPlay.addListener(() => setState(() {}));
@@ -79,11 +80,10 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                         AVMediaView(
                           initPlayer: _player,
                           backgroundColor: Colors.black,
-                          initSource: videoSources.first.path,
+                          initSource: videoSources.first,
                         ),
                         if (_player.mediaInfo.value != null &&
-                            (_player.mediaInfo.value!.width == 0 ||
-                                _player.mediaInfo.value!.height == 0))
+                            _player.videoSize.value == Size.zero)
                           const Text(
                             'Audio only',
                             style: TextStyle(
@@ -185,9 +185,9 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                 itemBuilder: (context, index) => AspectRatio(
                   aspectRatio: 16 / 9,
                   child: GestureDetector(
-                    onTap: () => _player.open(videoSources[index].path),
+                    onTap: () => _player.open(videoSources[index]),
                     child: AVMediaView(
-                      initSource: videoSources[index].path,
+                      initSource: videoSources[index],
                       backgroundColor: Colors.black,
                       sizingMode: SizingMode.free,
                     ),

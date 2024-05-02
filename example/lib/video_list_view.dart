@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:av_media_player/player.dart';
 import 'package:av_media_player/utils.dart';
 import 'package:inview_notifier_list/inview_notifier_list.dart';
-import 'defines.dart';
+import 'sources.dart';
 
 class VideoListView extends StatefulWidget {
   const VideoListView({super.key});
@@ -19,15 +19,18 @@ class _VideoListView extends State<VideoListView> with SetStateAsync {
     super.initState();
     for (var i = 0; i < videoSources.length; i++) {
       final player = AVMediaPlayer(initLooping: true);
-      player.mediaInfo.addListener(() => setState(() {}));
+      // Listening to mediaInfo is optional in this case.
+      // As loading always become false when mediaInfo is perpared.
+      // player.mediaInfo.addListener(() => setState(() {}));
       player.loading.addListener(() => setState(() {}));
+      player.videoSize.addListener(() => setState(() {}));
       _players.add(player);
     }
   }
 
   @override
   void dispose() {
-    //We should dispose all the players. cause they are managed by the user.
+    // We should dispose all the players. cause they are managed by the user.
     for (final player in _players) {
       player.dispose();
     }
@@ -55,15 +58,12 @@ class _VideoListView extends State<VideoListView> with SetStateAsync {
                 children: [
                   // We can use Texture widget instead of AVPlayerView to display video.
                   // But we have to make sure the player is initialized before doing that. (_players[index].id.value != null)
-                  // In this case we check _players[index].mediaInfo.value != null which also guarantees that the player is initialized.
-                  _players[index].mediaInfo.value == null ||
-                          _players[index].mediaInfo.value!.width == 0 ||
-                          _players[index].mediaInfo.value!.height == 0
-                      ? Container(color: Colors.black)
-                      : Texture(textureId: _players[index].id.value!),
+                  // In this case we check _players[index].videoSize.value != Size.zero which also guarantees the player is initialized.
+                  _players[index].videoSize.value != Size.zero
+                      ? Texture(textureId: _players[index].id.value!)
+                      : Container(color: Colors.black),
                   if (_players[index].mediaInfo.value != null &&
-                      (_players[index].mediaInfo.value!.width == 0 ||
-                          _players[index].mediaInfo.value!.height == 0))
+                      _players[index].videoSize.value == Size.zero)
                     const Text(
                       'Audio only',
                       style: TextStyle(
@@ -82,7 +82,7 @@ class _VideoListView extends State<VideoListView> with SetStateAsync {
               // We should open the video only if it's not already opened and not loading.
               if (_players[index].mediaInfo.value == null &&
                   !_players[index].loading.value) {
-                _players[index].open(videoSources[index].path);
+                _players[index].open(videoSources[index]);
               }
               _players[index].play();
             } else {

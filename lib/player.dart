@@ -15,12 +15,11 @@ class BufferRange {
 }
 
 /// This type is used by [AVMediaPlayer], for showing current media info.
+/// If duration is 0, it means the media is a live stream
 class MediaInfo {
-  final int width;
-  final int height;
   final int duration;
   final String source;
-  const MediaInfo(this.width, this.height, this.duration, this.source);
+  const MediaInfo(this.duration, this.source);
 }
 
 /// The class to create and control [AVMediaPlayer] instance.
@@ -36,6 +35,10 @@ class AVMediaPlayer {
   /// The information of the current media.
   /// It's null before the media is opened.
   final mediaInfo = ValueNotifier<MediaInfo?>(null);
+
+  /// The size of the current video.
+  /// This value is Size.zero by default, and may change during playback.
+  final videoSize = ValueNotifier<Size>(Size.zero);
 
   /// The position of the current media in milliseconds.
   /// It's 0 before the media is opened.
@@ -103,8 +106,7 @@ class AVMediaPlayer {
           if (_source == e['source']) {
             loading.value = false;
             playbackState.value = PlaybackState.paused;
-            mediaInfo.value =
-                MediaInfo(e['width'], e['height'], e['duration'], _source!);
+            mediaInfo.value = MediaInfo(e['duration'], _source!);
             if (autoPlay.value) {
               play();
             }
@@ -113,6 +115,23 @@ class AVMediaPlayer {
               _position = null;
             }
           }
+        } else if (e['event'] == 'videoSize') {
+          if (playbackState.value != PlaybackState.closed || loading.value) {
+            final width = e['width'] as double;
+            final height = e['height'] as double;
+            if (width != videoSize.value.width ||
+                height != videoSize.value.height) {
+              videoSize.value = width > 0 && height > 0
+                  ? Size(e['width'], e['height'])
+                  : Size.zero;
+            }
+          }
+        } else if (e['event'] == 'playbackState') {
+          playbackState.value = e['value'] == 'playing'
+              ? PlaybackState.playing
+              : e['value'] == 'paused'
+                  ? PlaybackState.paused
+                  : PlaybackState.closed;
         } else if (e['event'] == 'position') {
           if (mediaInfo.value != null) {
             position.value = e['value'] > mediaInfo.value!.duration
@@ -121,7 +140,7 @@ class AVMediaPlayer {
                     ? 0
                     : e['value'];
           }
-        } else if (e['event'] == 'bufferChange') {
+        } else if (e['event'] == 'buffer') {
           if (mediaInfo.value != null) {
             final begin = e['begin'] as int;
             final end = e['end'] as int;
@@ -135,6 +154,7 @@ class AVMediaPlayer {
             _source = null;
             error.value = e['value'];
             mediaInfo.value = null;
+            videoSize.value = Size.zero;
             position.value = 0;
             bufferRange.value = BufferRange.empty;
             finishedTimes.value = 0;
@@ -151,12 +171,17 @@ class AVMediaPlayer {
             loading.value = false;
           }
         } else if (e['event'] == 'finished') {
-          if (!looping.value) {
-            position.value = 0;
-            bufferRange.value = BufferRange.empty;
-            playbackState.value = PlaybackState.paused;
+          if (mediaInfo.value != null) {
+            if (!looping.value && mediaInfo.value!.duration != 0) {
+              position.value = 0;
+              bufferRange.value = BufferRange.empty;
+              playbackState.value = PlaybackState.paused;
+            }
+            finishedTimes.value += 1;
+            if (mediaInfo.value!.duration == 0) {
+              playbackState.value = PlaybackState.closed;
+            }
           }
-          finishedTimes.value += 1;
         }
       });
       if (_source != null) {
@@ -205,6 +230,7 @@ class AVMediaPlayer {
     _eventSubscription?.cancel();
     id.dispose();
     mediaInfo.dispose();
+    videoSize.dispose();
     position.dispose();
     error.dispose();
     loading.dispose();
@@ -224,6 +250,7 @@ class AVMediaPlayer {
     if (id.value != null) {
       error.value = null;
       mediaInfo.value = null;
+      videoSize.value = Size.zero;
       position.value = 0;
       bufferRange.value = BufferRange.empty;
       finishedTimes.value = 0;
@@ -243,6 +270,7 @@ class AVMediaPlayer {
         (playbackState.value != PlaybackState.closed || loading.value)) {
       _methodChannel.invokeMethod('close', id.value);
       mediaInfo.value = null;
+      videoSize.value = Size.zero;
       position.value = 0;
       bufferRange.value = BufferRange.empty;
       finishedTimes.value = 0;
@@ -294,19 +322,24 @@ class AVMediaPlayer {
   ///
   /// position: The position to seek to in milliseconds.
   bool seekTo(int position) {
-    if (id.value != null && mediaInfo.value != null) {
-      if (position < 0) {
-        position = 0;
-      } else if (position > mediaInfo.value!.duration) {
-        position = mediaInfo.value!.duration;
+    if (id.value != null) {
+      if (mediaInfo.value != null) {
+        if (position < 0) {
+          position = 0;
+        } else if (position > mediaInfo.value!.duration) {
+          position = mediaInfo.value!.duration;
+        }
+        _methodChannel.invokeMethod('seekTo', {
+          'id': id.value,
+          'value': position,
+        });
+        loading.value = true;
+        _seeked = true;
+        return true;
+      } else if (loading.value) {
+        _position = position;
+        return true;
       }
-      _methodChannel.invokeMethod('seekTo', {
-        'id': id.value,
-        'value': position,
-      });
-      loading.value = true;
-      _seeked = true;
-      return true;
     }
     return false;
   }

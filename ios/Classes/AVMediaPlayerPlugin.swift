@@ -143,7 +143,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	private var looping = false
 	private var reading: CMTime?
 	//0: idle, 1: opening, 2: ready, 3: playing
-	private var state = 0
+	private var state: UInt8 = 0
 	private var source: String?
 
 	init(registrar: FlutterPluginRegistrar) {
@@ -161,6 +161,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus), options: .old, context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.loadedTimeRanges), context: nil)
+		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.presentationSize), context: nil)
 	}
 
 	deinit {
@@ -169,15 +170,25 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus))
 		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status))
 		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.loadedTimeRanges))
+		avPlayer.removeObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.presentationSize))
 		textureRegistry.unregisterTexture(id)
 	}
 
 	func open(source: String) {
-		let uri = source.contains("://") ? URL(string: source) : URL(fileURLWithPath: source)
+		var uri: URL!
+		if source.starts(with: "asset://") {
+			if let path = Bundle.main.path(forResource: FlutterDartProject.lookupKey(forAsset: String(source.suffix(source.count - 8))), ofType: nil, inDirectory: nil) {
+				uri = URL(fileURLWithPath: path)
+			}
+		} else if source.contains("://") {
+			uri = URL(string: source)
+		} else {
+			uri = URL(fileURLWithPath: source)
+		}
 		if uri == nil {
 			eventSink?([
 				"event": "error",
-				"value": "Invalid path"
+				"value": "Invalid source"
 			])
 		} else {
 			close()
@@ -202,14 +213,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			avPlayer.currentItem?.remove(output!)
 			output = nil
 		}
-		if displayLink != nil {
-#if os(macOS)
-			CVDisplayLinkStop(displayLink!)
-#else
-			displayLink!.invalidate()
-#endif
-			displayLink = nil
-		}
+		stopVideo()
 		stopWatcher()
 		source = nil
 		reading = nil
@@ -226,7 +230,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	func play() {
 		if state > 1 {
 			state = 3
-			if watcher == nil {
+			if watcher == nil && avPlayer.currentItem != nil && avPlayer.currentItem!.duration.seconds > 0 {
 				watcher = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.01, preferredTimescale: 1000), queue: nil) { [weak self] time in
 					if self != nil {
 						if self!.avPlayer.rate == 0 || self!.avPlayer.error != nil {
@@ -248,7 +252,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	}
 
 	func seekTo(pos: CMTime) {
-		if avPlayer.currentTime() == pos {
+		if avPlayer.currentItem == nil || !(avPlayer.currentItem!.duration.seconds > 0) || avPlayer.currentTime() == pos {
 			eventSink?(["event": "seekEnd"])
 		} else {
 			avPlayer.seek(to: pos, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
@@ -276,6 +280,17 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
 	func setLooping(loop: Bool) {
 		looping = loop
+	}
+	
+	private func stopVideo() {
+		if displayLink != nil {
+#if os(macOS)
+			CVDisplayLinkStop(displayLink!)
+#else
+			displayLink!.invalidate()
+#endif
+			displayLink = nil
+		}
 	}
 	
 	private func stopWatcher() {
@@ -307,22 +322,29 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			return nil
 		}
 	}
-	
+
 	@objc private func onFinish(notification: NSNotification) {
 		if state == 3 {
-			avPlayer.seek(to: .zero) { [weak self] finished in
-				if self != nil {
-					if self!.looping {
-						self!.play()
-					} else {
-						self!.state = 2
-						if finished {
-							self!.position = .zero
-							self!.bufferPosition = .zero
-						}
-					}
-					self!.eventSink?(["event": "finished"])
+			if avPlayer.currentItem == nil || avPlayer.currentItem!.duration == .zero {
+				if avPlayer.currentItem != nil {
+					close()
 				}
+				eventSink?(["event": "finished"])
+			} else {
+				avPlayer.seek(to: .zero) { [weak self] finished in
+				 if self != nil {
+					 if self!.looping {
+						 self!.play()
+					 } else {
+						 self!.state = 2
+						 if finished {
+							 self!.position = .zero
+							 self!.bufferPosition = .zero
+						 }
+					 }
+					 self!.eventSink?(["event": "finished"])
+				 }
+			 }
 			}
 		}
 	}
@@ -339,56 +361,6 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
 	override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
 		switch keyPath {
-		case #keyPath(AVPlayer.currentItem.status):
-			switch avPlayer.currentItem?.status {
-			case .readyToPlay:
-				//to ensure the first frame is loaded
-				avPlayer.seek(to: .zero) { [weak self] finished in
-					if self != nil && self!.source != nil,
-						let currentItem = self!.avPlayer.currentItem {
-						let width = Int(currentItem.presentationSize.width)
-						let height = Int(currentItem.presentationSize.height)
-						let duration = Int(currentItem.duration.seconds * 1000)
-						if width > 0 && height > 0 && duration > 0 {
-							self!.output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
-							currentItem.add(self!.output!)
-#if os(macOS)
-							CVDisplayLinkCreateWithActiveCGDisplays(&self!.displayLink)
-							if self!.displayLink != nil {
-								CVDisplayLinkSetOutputCallback(self!.displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
-									let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
-									player.displayCallback(outputTime: outputTime.pointee)
-									return kCVReturnSuccess
-								}, Unmanaged.passUnretained(self!).toOpaque())
-								CVDisplayLinkStart(self!.displayLink!)
-							}
-#else
-							self!.displayLink = CADisplayLink(target: self!, selector: #selector(self!.displayCallback))
-							self!.displayLink!.add(to: .current, forMode: .common)
-#endif
-						}
-						self!.avPlayer.volume = self!.volume
-						self!.state = 2
-						self!.eventSink?([
-							"event": "mediaInfo",
-							"duration": duration,
-							"width": width,
-							"height": height,
-							"source": self!.source!
-						])
-					}
-				}
-			case .failed:
-				if state != 0 {
-					eventSink?([
-						"event": "error",
-						"value": avPlayer.currentItem?.error?.localizedDescription ?? "Unknown error"
-					])
-					close()
-				}
-			default:
-				break
-			}
 		case #keyPath(AVPlayer.timeControlStatus):
 			if let oldValue = change?[NSKeyValueChangeKey.oldKey] as? Int,
 				let oldStatus = AVPlayer.TimeControlStatus(rawValue: oldValue),
@@ -398,16 +370,71 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 					"value": avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate
 				])
 			}
+		case #keyPath(AVPlayer.currentItem.status):
+			switch avPlayer.currentItem?.status {
+			case .readyToPlay:
+				avPlayer.volume = volume
+				state = 2
+				eventSink?([
+					"event": "mediaInfo",
+					"duration": avPlayer.currentItem!.duration.seconds > 0 ? Int(avPlayer.currentItem!.duration.seconds * 1000) : 0,
+					"source": source!
+				])
+			case .failed:
+				if state > 0 {
+					eventSink?([
+						"event": "error",
+						"value": avPlayer.currentItem?.error?.localizedDescription ?? "Unknown error"
+					])
+					close()
+				}
+			default:
+				break
+			}
+		case #keyPath(AVPlayer.currentItem.presentationSize):
+			if let width = avPlayer.currentItem?.presentationSize.width,
+				let height = avPlayer.currentItem?.presentationSize.height,
+				state > 0 {
+				if width == 0 || height == 0 {
+					stopVideo()
+				} else {
+					if displayLink == nil {
+						output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
+						avPlayer.currentItem!.add(output!)
+#if os(macOS)
+						CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
+						if displayLink != nil {
+							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
+								let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
+								player.displayCallback(outputTime: outputTime.pointee)
+								return kCVReturnSuccess
+							}, Unmanaged.passUnretained(self).toOpaque())
+							CVDisplayLinkStart(displayLink!)
+						}
+#else
+						displayLink = CADisplayLink(target: self, selector: #selector(displayCallback))
+						displayLink!.add(to: .current, forMode: .common)
+#endif
+					}
+				}
+				eventSink?([
+					"event": "videoSize",
+					"width": width,
+					"height": height
+				])
+			}
 		case #keyPath(AVPlayer.currentItem.loadedTimeRanges):
-			if let currentTime = avPlayer.currentItem?.currentTime(),
-				let timeRanges = avPlayer.currentItem?.loadedTimeRanges as? [CMTimeRange] {
+			if let duration = avPlayer.currentItem?.duration.seconds,
+				let currentTime = avPlayer.currentItem?.currentTime(),
+				let timeRanges = avPlayer.currentItem?.loadedTimeRanges as? [CMTimeRange],
+				state > 1 && duration > 0 {
 				for timeRange in timeRanges {
 					let end = timeRange.start + timeRange.duration
 					if timeRange.start <= currentTime && end >= currentTime {
 						if end != bufferPosition {
 							bufferPosition = end
 							eventSink?([
-								"event": "bufferChange",
+								"event": "buffer",
 								"begin": Int(currentTime.seconds * 1000),
 								"end": Int(bufferPosition.seconds * 1000)
 							])

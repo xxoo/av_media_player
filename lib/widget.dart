@@ -83,17 +83,13 @@ class _AVMediaState extends State<AVMediaView> with SetStateAsync {
         _player!.setSpeed(widget.initSpeed!);
       }
       if (widget.initPosition != null) {
-        if (_player!.mediaInfo.value == null) {
-          _player!.mediaInfo.addListener(_initPosition);
-        } else {
-          _player!.seekTo(widget.initPosition!);
-        }
+        _player!.seekTo(widget.initPosition!);
       }
     }
     if (widget.onCreated != null) {
       widget.onCreated!(_player!);
     }
-    _player!.mediaInfo.addListener(_update);
+    _player!.videoSize.addListener(_update);
   }
 
   @override
@@ -108,7 +104,7 @@ class _AVMediaState extends State<AVMediaView> with SetStateAsync {
   void dispose() {
     if (_foreignPlayer) {
       try {
-        _player?.mediaInfo.removeListener(_update);
+        _player?.videoSize.removeListener(_update);
       } catch (_) {}
     } else {
       _player?.dispose();
@@ -118,18 +114,18 @@ class _AVMediaState extends State<AVMediaView> with SetStateAsync {
 
   @override
   Widget build(BuildContext context) {
-    if (_hasVideo()) {
+    if (_player!.videoSize.value != Size.zero) {
       final texture = Texture(textureId: _player!.id.value!);
       if (widget.sizingMode == SizingMode.keepAspectRatio) {
         return AspectRatio(
-          aspectRatio: _player!.mediaInfo.value!.width /
-              _player!.mediaInfo.value!.height,
+          aspectRatio:
+              _player!.videoSize.value.width / _player!.videoSize.value.height,
           child: texture,
         );
       } else if (widget.sizingMode == SizingMode.originalSize) {
         return SizedBox(
-          width: _player!.mediaInfo.value!.width.toDouble(),
-          height: _player!.mediaInfo.value!.height.toDouble(),
+          width: _player!.videoSize.value.width,
+          height: _player!.videoSize.value.height,
           child: texture,
         );
       } else {
@@ -139,19 +135,6 @@ class _AVMediaState extends State<AVMediaView> with SetStateAsync {
       return Container(color: widget.backgroundColor);
     }
   }
-
-  void _initPosition() {
-    _player?.mediaInfo.removeListener(_initPosition);
-    if (widget.initPosition != null) {
-      _player?.seekTo(widget.initPosition!);
-    }
-  }
-
-  bool _hasVideo() =>
-      _player?.mediaInfo.value != null &&
-      _player!.mediaInfo.value!.width > 0 &&
-      _player!.mediaInfo.value!.height > 0 &&
-      _player!.mediaInfo.value!.duration > 0;
 
   void _update() => setState(() {});
 }
