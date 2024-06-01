@@ -17,7 +17,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) => Stack(
         alignment: Alignment.center,
         children: [
-          AVMediaView(
+          AvMediaView(
             initSource:
                 'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
             initLooping: true,

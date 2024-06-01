@@ -10,9 +10,259 @@ import android.os.Handler
 import android.os.Looper
 import kotlin.math.max
 
-class AVMediaPlayerPlugin: FlutterPlugin, FlutterEngine.EngineLifecycleListener {
+class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler {
+	private val surfaceTextureEntry = binding.textureRegistry.createSurfaceTexture()
+	val id = surfaceTextureEntry.id()
+	private val eventChannel = EventChannel(binding.binaryMessenger, "av_media_player/$id")
+	private val surface = Surface(surfaceTextureEntry.surfaceTexture())
+	private val mediaPlayer = MediaPlayer()
+	private val handler = Handler(Looper.myLooper() ?: Looper.getMainLooper())
+
+	private var speed = 1f
+	private var volume = 1f
+	private var looping = false
+	private var position = 0
+	private var eventSink: EventChannel.EventSink? = null
+	private var watching = false
+	private var stillPreparing = false
+	private var bufferPosition = 0
+	//0: idle, 1: opening, 2: ready, 3: playing
+	private var state = 0u
+	private var finished = false
+	private var hasVideo = false
+	private var source: String? = null
+
+	init {
+		eventChannel.setStreamHandler(this)
+		mediaPlayer.setOnPreparedListener {
+			state = 2u
+			mediaPlayer.setVolume(volume, volume)
+			if (mediaPlayer.duration > 0) {
+				//to ensure the first frame is loaded
+				mediaPlayer.seekTo(0)
+				stillPreparing = true
+			} else if (source != null) {
+				eventSink?.success(mapOf(
+					"event" to "mediaInfo",
+					"duration" to max(mediaPlayer.duration, 0),
+					"source" to source
+				))
+			}
+		}
+		mediaPlayer.setOnVideoSizeChangedListener { _, _, _ ->
+			if (state > 0u) {
+				if (mediaPlayer.videoWidth > 0 && mediaPlayer.videoHeight > 0) {
+					if (!hasVideo) {
+						hasVideo = true
+						mediaPlayer.setSurface(surface)
+					}
+				} else if (hasVideo) {
+					hasVideo = false
+					mediaPlayer.setSurface(null)
+				}
+				eventSink?.success(mapOf(
+					"event" to "videoSize",
+					"width" to mediaPlayer.videoWidth.toDouble(),
+					"height" to mediaPlayer.videoHeight.toDouble()
+				))
+			}
+		}
+		mediaPlayer.setOnCompletionListener {
+			if (state == 3u) {
+				if (mediaPlayer.duration <= 0) {
+					close()
+				} else if (looping) {
+					play()
+				} else {
+					state = 2u
+					position = 0
+					bufferPosition = 0
+					finished = true
+				}
+				eventSink?.success(mapOf("event" to "finished"))
+			}
+		}
+		mediaPlayer.setOnErrorListener { _, what, extra ->
+			if (state != 0u) {
+				close()
+				eventSink?.success(mapOf(
+					"event" to "error",
+					"value" to "$what,$extra"
+				))
+			}
+			true
+		}
+		mediaPlayer.setOnInfoListener { _, what, _ ->
+			if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
+				eventSink?.success(mapOf(
+					"event" to "loading",
+					"value" to true
+				))
+			} else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
+				eventSink?.success(mapOf(
+					"event" to "loading",
+					"value" to false
+				))
+			}
+			true
+		}
+		mediaPlayer.setOnSeekCompleteListener {
+			//the video is real prepared now
+			if (stillPreparing) {
+				stillPreparing = false
+				if (source != null) {
+					eventSink?.success(mapOf(
+						"event" to "mediaInfo",
+						"duration" to mediaPlayer.duration,
+						"source" to source
+					))
+				}
+			} else {
+				if (!watching) {
+					watchPosition()
+				}
+				eventSink?.success(mapOf("event" to "seekEnd"))
+			}
+		}
+		mediaPlayer.setOnBufferingUpdateListener { _, percent ->
+			if (state > 1u) {
+				val bufferPos: Int = mediaPlayer.duration * percent / 100
+				val pos = mediaPlayer.currentPosition
+				val realBufferPosition = max(bufferPos,  pos)
+				if (realBufferPosition != bufferPosition) {
+					bufferPosition = realBufferPosition
+					eventSink?.success(mapOf(
+						"event" to "buffer",
+						"begin" to pos,
+						"end" to bufferPosition
+					))
+				}
+			}
+		}
+	}
+
+	fun dispose() {
+		mediaPlayer.release()
+		surface.release()
+		surfaceTextureEntry.release()
+		handler.removeCallbacksAndMessages(null)
+		eventSink?.endOfStream()
+	}
+
+	fun open(source: String) {
+		close()
+		this.source = source
+		state = 1u
+		if (hasVideo) {
+			mediaPlayer.setSurface(null)
+		}
+		try {
+			if (source.startsWith("asset://")) {
+				mediaPlayer.setDataSource(binding.applicationContext.assets.openFd(binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8))))
+			} else {
+				mediaPlayer.setDataSource(source)
+			}
+			mediaPlayer.prepareAsync()
+		} catch (e: Exception) {
+			eventSink?.success(mapOf(
+				"event" to "error",
+				"value" to e.toString()
+			))
+		}
+	}
+
+	fun close() {
+		source = null
+		finished = false
+		hasVideo = false
+		state = 0u
+		position = 0
+		bufferPosition = 0
+		stillPreparing = false
+		mediaPlayer.setSurface(null)
+		mediaPlayer.reset()
+	}
+
+	fun play() {
+		if (state > 1u) {
+			finished = false
+			state = 3u
+			mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
+			if (!watching && mediaPlayer.duration > 0) {
+				startWatcher()
+			}
+		}
+	}
+
+	fun pause() {
+		if (state == 3u) {
+			state = 2u
+			mediaPlayer.pause()
+		}
+	}
+
+	fun seekTo(pos: Int) {
+		if (mediaPlayer.duration <= 0 || mediaPlayer.currentPosition == pos) {
+			eventSink?.success(mapOf("event" to "seekEnd"))
+		} else {
+			finished = false
+			mediaPlayer.seekTo(pos.toLong(), MediaPlayer.SEEK_CLOSEST)
+		}
+	}
+
+	fun setVolume(vol: Float) {
+		volume = vol
+		mediaPlayer.setVolume(vol, vol)
+	}
+
+	fun setSpeed(spd: Float) {
+		speed = spd
+		if (mediaPlayer.isPlaying) {
+			mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(spd)
+		}
+	}
+
+	fun setLooping(loop: Boolean) {
+		looping = loop
+	}
+
+	private fun startWatcher() {
+		watching = true
+		handler.postDelayed({
+			if (mediaPlayer.isPlaying) {
+				startWatcher()
+			} else {
+				watching = false
+			}
+			if (watching || !finished) {
+				watchPosition()
+			}
+		}, 100)
+	}
+
+	private fun watchPosition() {
+		val pos = mediaPlayer.currentPosition
+		if (pos != position) {
+			position = pos
+			eventSink?.success(mapOf(
+				"event" to "position",
+				"value" to pos
+			))
+		}
+	}
+
+	override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+		eventSink = events
+	}
+
+	override fun onCancel(arguments: Any?) {
+		eventSink = null
+	}
+}
+
+class AvMediaPlayerPlugin: FlutterPlugin, FlutterEngine.EngineLifecycleListener {
 	private lateinit var methodChannel: MethodChannel
-	private val players = mutableMapOf<Long, AVMediaPlayer>()
+	private val players = mutableMapOf<Long, AvMediaPlayer>()
 
 	override fun onEngineWillDestroy() {
 		for (player in players.values) {
@@ -25,13 +275,13 @@ class AVMediaPlayerPlugin: FlutterPlugin, FlutterEngine.EngineLifecycleListener 
 		onEngineWillDestroy()
 	}
 
-	override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-		flutterPluginBinding.flutterEngine.addEngineLifecycleListener(this)
-		methodChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "avMediaPlayer")
+	override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+		binding.flutterEngine.addEngineLifecycleListener(this)
+		methodChannel = MethodChannel(binding.binaryMessenger, "av_media_player")
 		methodChannel.setMethodCallHandler { call, result ->
 			when (call.method) {
 				"create" -> {
-					val player = AVMediaPlayer(flutterPluginBinding)
+					val player = AvMediaPlayer(binding)
 					players[player.id] = player
 					result.success(player.id)
 				}
@@ -96,256 +346,5 @@ class AVMediaPlayerPlugin: FlutterPlugin, FlutterEngine.EngineLifecycleListener 
 	override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
 		methodChannel.setMethodCallHandler(null)
 		onEngineWillDestroy()
-	}
-}
-
-class AVMediaPlayer(binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler {
-	private val binding = binding
-	private val surfaceTextureEntry = binding.textureRegistry.createSurfaceTexture()
-	val id = surfaceTextureEntry.id()
-	private val eventChannel = EventChannel(binding.binaryMessenger, "avMediaPlayer/$id")
-	private val surface = Surface(surfaceTextureEntry.surfaceTexture())
-	private val mediaPlayer = MediaPlayer()
-	private val handler = Handler(Looper.myLooper() ?: Looper.getMainLooper())
-
-	private var speed = 1f
-	private var volume = 1f
-	private var looping = false
-	private var position = 0
-	private var eventSink: EventChannel.EventSink? = null
-	private var watching = false
-	private var stillPreparing = false
-	private var bufferPosition = 0
-	//0: idle, 1: opening, 2: ready, 3: playing
-	private var state = 0
-	private var finished = false
-	private var hasVideo = false
-	private var source: String? = null
-
-	init {
-		eventChannel.setStreamHandler(this)
-		mediaPlayer.setOnPreparedListener {
-			state = 2
-			mediaPlayer.setVolume(volume, volume)
-			if (mediaPlayer.duration > 0) {
-				//to ensure the first frame is loaded
-				mediaPlayer.seekTo(0)
-				stillPreparing = true
-			} else if (source != null) {
-				eventSink?.success(mapOf(
-					"event" to "mediaInfo",
-					"duration" to max(mediaPlayer.duration, 0),
-					"source" to source
-				))
-			}
-		}
-		mediaPlayer.setOnVideoSizeChangedListener { _, _, _ ->
-			if (state > 0) {
-				if (mediaPlayer.videoWidth > 0 && mediaPlayer.videoHeight > 0) {
-					if (!hasVideo) {
-						hasVideo = true
-						mediaPlayer.setSurface(surface)
-					}
-				} else if (hasVideo) {
-					hasVideo = false
-					mediaPlayer.setSurface(null)
-				}
-				eventSink?.success(mapOf(
-					"event" to "videoSize",
-					"width" to mediaPlayer.videoWidth.toDouble(),
-					"height" to mediaPlayer.videoHeight.toDouble()
-				))
-			}
-		}
-		mediaPlayer.setOnCompletionListener {
-			if (state == 3) {
-				if (mediaPlayer.duration <= 0) {
-					close()
-				} else if (looping) {
-					play()
-				} else {
-					state = 2
-					position = 0
-					bufferPosition = 0
-					finished = true
-				}
-				eventSink?.success(mapOf("event" to "finished"))
-			}
-		}
-		mediaPlayer.setOnErrorListener { _, what, extra ->
-			if (state != 0) {
-				close()
-				eventSink?.success(mapOf(
-					"event" to "error",
-					"value" to "$what,$extra"
-				))
-			}
-			true
-		}
-		mediaPlayer.setOnInfoListener { _, what, _ ->
-			if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
-				eventSink?.success(mapOf(
-					"event" to "loading",
-					"value" to true
-				))
-			} else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
-				eventSink?.success(mapOf(
-					"event" to "loading",
-					"value" to false
-				))
-			}
-			true
-		}
-		mediaPlayer.setOnSeekCompleteListener {
-			//the video is real prepared now
-			if (stillPreparing) {
-				stillPreparing = false
-				if (source != null) {
-					eventSink?.success(mapOf(
-						"event" to "mediaInfo",
-						"duration" to mediaPlayer.duration,
-						"source" to source
-					))
-				}
-			} else {
-				if (!watching) {
-					watchPosition()
-				}
-				eventSink?.success(mapOf("event" to "seekEnd"))
-			}
-		}
-		mediaPlayer.setOnBufferingUpdateListener { _, percent ->
-			if (state > 1) {
-				val bufferPos: Int = mediaPlayer.duration * percent / 100
-				val pos = mediaPlayer.currentPosition
-				val realBufferPosition = max(bufferPos,  pos)
-				if (realBufferPosition != bufferPosition) {
-					bufferPosition = realBufferPosition
-					eventSink?.success(mapOf(
-						"event" to "buffer",
-						"begin" to pos,
-						"end" to bufferPosition
-					))
-				}
-			}
-		}
-	}
-
-	fun dispose() {
-		mediaPlayer.release()
-		surface.release()
-		surfaceTextureEntry.release()
-		handler.removeCallbacksAndMessages(null)
-		eventSink?.endOfStream()
-	}
-
-	fun open(source: String) {
-		close()
-		this.source = source
-		state = 1
-		if (hasVideo) {
-			mediaPlayer.setSurface(null)
-		}
-		try {
-			if (source.startsWith("asset://")) {
-				mediaPlayer.setDataSource(binding.applicationContext.assets.openFd(binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8))))
-			} else {
-				mediaPlayer.setDataSource(source)
-			}
-			mediaPlayer.prepareAsync()
-		} catch (e: Exception) {
-			eventSink?.success(mapOf(
-				"event" to "error",
-				"value" to e.toString()
-			))
-		}
-	}
-
-	fun close() {
-		source = null
-		finished = false
-		hasVideo = false
-		state = 0
-		position = 0
-		bufferPosition = 0
-		stillPreparing = false
-		mediaPlayer.setSurface(null)
-		mediaPlayer.reset()
-	}
-
-	fun play() {
-		if (state > 1) {
-			finished = false
-			state = 3
-			mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
-			if (!watching && mediaPlayer.duration > 0) {
-				startWatcher()
-			}
-		}
-	}
-
-	fun pause() {
-		if (state == 3) {
-			state = 2
-			mediaPlayer.pause()
-		}
-	}
-
-	fun seekTo(pos: Int) {
-		if (mediaPlayer.duration <= 0 || mediaPlayer.currentPosition == pos) {
-			eventSink?.success(mapOf("event" to "seekEnd"))
-		} else {
-			finished = false
-			mediaPlayer.seekTo(pos.toLong(), MediaPlayer.SEEK_CLOSEST)
-		}
-	}
-
-	fun setVolume(vol: Float) {
-		volume = vol
-		mediaPlayer.setVolume(vol, vol)
-	}
-
-	fun setSpeed(spd: Float) {
-		speed = spd
-		if (mediaPlayer.isPlaying) {
-			mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(spd)
-		}
-	}
-
-	fun setLooping(loop: Boolean) {
-		looping = loop
-	}
-
-	private fun startWatcher() {
-		watching = true
-		handler.postDelayed({
-			if (mediaPlayer.isPlaying) {
-				startWatcher()
-			} else {
-				watching = false
-			}
-			if (watching || !finished) {
-				watchPosition()
-			}
-		}, 100)
-	}
-
-	private fun watchPosition() {
-		val pos = mediaPlayer.currentPosition
-		if (pos != position) {
-			position = pos
-			eventSink?.success(mapOf(
-				"event" to "position",
-				"value" to pos
-			))
-		}
-	}
-
-	override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-		eventSink = events
-	}
-
-	override fun onCancel(arguments: Any?) {
-		eventSink = null
 	}
 }

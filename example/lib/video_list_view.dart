@@ -12,13 +12,13 @@ class VideoListView extends StatefulWidget {
 }
 
 class _VideoListView extends State<VideoListView> with SetStateAsync {
-  final _players = <AVMediaPlayer>[];
+  final _players = <AvMediaPlayer>[];
 
   @override
   void initState() {
     super.initState();
     for (var i = 0; i < videoSources.length; i++) {
-      final player = AVMediaPlayer(initLooping: true);
+      final player = AvMediaPlayer(initLooping: true);
       // Listening to mediaInfo is optional in this case.
       // As loading always become false when mediaInfo is perpared.
       // player.mediaInfo.addListener(() => setState(() {}));

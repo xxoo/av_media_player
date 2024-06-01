@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
 
-/// This mixin is used by [AVMediaView] to avoid [setState] issues.
+/// This mixin is used by [AvMediaView] to avoid [setState] issues.
 ///
 /// It is recommended to add this mixin in your [StatefulWidget]'s [State] class
-/// while using [AVMediaPlayer] or [AVMediaView].
+/// while using [AvMediaPlayer] or [AvMediaView].
 mixin SetStateAsync<T extends StatefulWidget> on State<T> {
   final _fns = <VoidCallback>[];
   void _runFns() {

@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// This type is used by [AVMediaPlayer], for showing current playback state.
+/// This type is used by [AvMediaPlayer], for showing current playback state.
 enum PlaybackState { playing, paused, closed }
 
-/// This type is used by [AVMediaPlayer], for showing current buffer status.
+/// This type is used by [AvMediaPlayer], for showing current buffer status.
 class BufferRange {
   static const empty = BufferRange(0, 0);
 
@@ -14,19 +14,22 @@ class BufferRange {
   const BufferRange(this.begin, this.end);
 }
 
-/// This type is used by [AVMediaPlayer], for showing current media info.
-/// If duration is 0, it means the media is a live stream
+/// This type is used by [AvMediaPlayer], for showing current media info.
+/// If duration is 0, it means the media is a realtime stream
 class MediaInfo {
   final int duration;
   final String source;
   const MediaInfo(this.duration, this.source);
 }
 
-/// The class to create and control [AVMediaPlayer] instance.
+/// The class to create and control [AvMediaPlayer] instance.
 ///
 /// Do NOT modify properties directly, use the corresponding methods instead.
-class AVMediaPlayer {
-  static const _methodChannel = MethodChannel('avMediaPlayer');
+class AvMediaPlayer {
+  static const _methodChannel = MethodChannel('av_media_player');
+
+  /// Whether the player is disposed.
+  bool disposed = false;
 
   /// The id of the player. It's null before the player is initialized.
   /// After the player is initialized it will be unique and never change again.
@@ -88,7 +91,7 @@ class AVMediaPlayer {
   bool _seeked = false;
 
   /// All the parameters are optional, and can be changed later by calling the corresponding methods.
-  AVMediaPlayer({
+  AvMediaPlayer({
     String? initSource,
     double? initVolume,
     double? initSpeed,
@@ -98,7 +101,7 @@ class AVMediaPlayer {
   }) {
     _methodChannel.invokeMethod('create').then((value) {
       id.value = value as int;
-      _eventSubscription = EventChannel('avMediaPlayer/${id.value}')
+      _eventSubscription = EventChannel('av_media_player/${id.value}')
           .receiveBroadcastStream()
           .listen((event) {
         final e = event as Map;
@@ -226,20 +229,23 @@ class AVMediaPlayer {
 
   /// Dispose the player
   void dispose() {
-    _methodChannel.invokeMethod('dispose', id.value);
-    _eventSubscription?.cancel();
-    id.dispose();
-    mediaInfo.dispose();
-    videoSize.dispose();
-    position.dispose();
-    error.dispose();
-    loading.dispose();
-    playbackState.dispose();
-    volume.dispose();
-    speed.dispose();
-    looping.dispose();
-    autoPlay.dispose();
-    finishedTimes.dispose();
+    if (!disposed) {
+      disposed = true;
+      _eventSubscription?.cancel();
+      _methodChannel.invokeMethod('dispose', id.value);
+      id.dispose();
+      mediaInfo.dispose();
+      videoSize.dispose();
+      position.dispose();
+      error.dispose();
+      loading.dispose();
+      playbackState.dispose();
+      volume.dispose();
+      speed.dispose();
+      looping.dispose();
+      autoPlay.dispose();
+      finishedTimes.dispose();
+    }
   }
 
   /// Open a media file

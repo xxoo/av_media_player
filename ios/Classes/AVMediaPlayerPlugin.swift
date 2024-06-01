@@ -5,104 +5,7 @@ import FlutterMacOS
 import Flutter
 #endif
 
-public class AVMediaPlayerPlugin: NSObject, FlutterPlugin {
-	public static func register(with registrar: FlutterPluginRegistrar) {
-#if os(macOS)
-		let messager = registrar.messenger
-#else
-		let messager = registrar.messenger()
-#endif
-		registrar.addMethodCallDelegate(
-			AVMediaPlayerPlugin(registrar: registrar),
-			channel: FlutterMethodChannel(name: "avMediaPlayer", binaryMessenger: messager)
-		)
-	}
-
-	private var players: [Int64: AVMediaPlayer] = [:]
-	private let registrar: FlutterPluginRegistrar
-
-	init(registrar: FlutterPluginRegistrar) {
-		self.registrar = registrar
-		super.init()
-	}
-
-	public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
-		for player in players.values {
-			player.close()
-		}
-		players.removeAll()
-	}
-
-	public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-		switch call.method {
-		case "create":
-			let player = AVMediaPlayer(registrar: registrar)
-			players[player.id] = player
-			result(player.id)
-		case "dispose":
-			result(nil)
-			if let id = call.arguments as? Int64,
-				let player = players[id] {
-				player.close()
-				players.removeValue(forKey: id)
-			}
-		case "open":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? String {
-				players[id]?.open(source: value)
-			}
-		case "close":
-			result(nil)
-			if let id = call.arguments as? Int64 {
-				players[id]?.close()
-			}
-		case "play":
-			result(nil)
-			if let id = call.arguments as? Int64 {
-				players[id]?.play()
-			}
-		case "pause":
-			result(nil)
-			if let id = call.arguments as? Int64 {
-				players[id]?.pause()
-			}
-		case "seekTo":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Double {
-				players[id]?.seekTo(pos: CMTime(seconds: value / 1000, preferredTimescale: 1000))
-			}
-		case "setVolume":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Float {
-				players[id]?.setVolume(vol: value)
-			}
-		case "setSpeed":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Float {
-				players[id]?.setSpeed(spd: value)
-			}
-		case "setLooping":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Bool {
-				players[id]?.setLooping(loop: value)
-			}
-		default:
-			result(FlutterMethodNotImplemented)
-		}
-	}
-}
-
-class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
+class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 #if os(macOS)
 	private var displayLink: CVDisplayLink?
 	func displayCallback(outputTime: CVTimeStamp) {
@@ -156,7 +59,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 #endif
 		super.init()
 		id = textureRegistry.register(self)
-		eventChannel = FlutterEventChannel(name: "avMediaPlayer/\(id!)", binaryMessenger: messager)
+		eventChannel = FlutterEventChannel(name: "av_media_player/\(id!)", binaryMessenger: messager)
 		eventChannel.setStreamHandler(self)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus), options: .old, context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
@@ -405,7 +308,7 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 						CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
 						if displayLink != nil {
 							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
-								let player: AVMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
+								let player: AvMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
 								player.displayCallback(outputTime: outputTime.pointee)
 								return kCVReturnSuccess
 							}, Unmanaged.passUnretained(self).toOpaque())
@@ -445,6 +348,103 @@ class AVMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			}
 		default:
 			break
+		}
+	}
+}
+
+public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
+	public static func register(with registrar: FlutterPluginRegistrar) {
+#if os(macOS)
+		let messager = registrar.messenger
+#else
+		let messager = registrar.messenger()
+#endif
+		registrar.addMethodCallDelegate(
+			AvMediaPlayerPlugin(registrar: registrar),
+			channel: FlutterMethodChannel(name: "av_media_player", binaryMessenger: messager)
+		)
+	}
+
+	private var players: [Int64: AvMediaPlayer] = [:]
+	private let registrar: FlutterPluginRegistrar
+
+	init(registrar: FlutterPluginRegistrar) {
+		self.registrar = registrar
+		super.init()
+	}
+
+	public func detachFromEngine(for registrar: FlutterPluginRegistrar) {
+		for player in players.values {
+			player.close()
+		}
+		players.removeAll()
+	}
+
+	public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+		switch call.method {
+		case "create":
+			let player = AvMediaPlayer(registrar: registrar)
+			players[player.id] = player
+			result(player.id)
+		case "dispose":
+			result(nil)
+			if let id = call.arguments as? Int64,
+				let player = players[id] {
+				player.close()
+				players.removeValue(forKey: id)
+			}
+		case "open":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? String {
+				players[id]?.open(source: value)
+			}
+		case "close":
+			result(nil)
+			if let id = call.arguments as? Int64 {
+				players[id]?.close()
+			}
+		case "play":
+			result(nil)
+			if let id = call.arguments as? Int64 {
+				players[id]?.play()
+			}
+		case "pause":
+			result(nil)
+			if let id = call.arguments as? Int64 {
+				players[id]?.pause()
+			}
+		case "seekTo":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Double {
+				players[id]?.seekTo(pos: CMTime(seconds: value / 1000, preferredTimescale: 1000))
+			}
+		case "setVolume":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Float {
+				players[id]?.setVolume(vol: value)
+			}
+		case "setSpeed":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Float {
+				players[id]?.setSpeed(spd: value)
+			}
+		case "setLooping":
+			result(nil)
+			if let args = call.arguments as? [String: Any],
+				let id = args["id"] as? Int64,
+				let value = args["value"] as? Bool {
+				players[id]?.setLooping(loop: value)
+			}
+		default:
+			result(FlutterMethodNotImplemented)
 		}
 	}
 }

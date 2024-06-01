@@ -1,6 +1,6 @@
 name: av_media_player
-description: "A lightweight media player for flutter. Which uses Texture Widget for video rendering. Backend builts on AVPlayer(ios/macos) and MediaPlayer(Android)."
-version: 0.6.7
+description: "A lightweight media player for flutter that builds on system components. Video rendering in Texture widget."
+version: 0.6.8
 repository: "https://github.com/xxoo/av_media_player"
 issue_tracker: "https://github.com/xxoo/av_media_player/issues"
 topics:
@@ -26,8 +26,10 @@ flutter:
     platforms:
       android:
         package: dev.xx.av_media_player
-        pluginClass: AVMediaPlayerPlugin
+        pluginClass: AvMediaPlayerPlugin
       ios:
-        pluginClass: AVMediaPlayerPlugin
+        pluginClass: AvMediaPlayerPlugin
       macos:
-        pluginClass: AVMediaPlayerPlugin
+        pluginClass: AvMediaPlayerPlugin
+      windows:
+        pluginClass: AvMediaPlayerPluginCApi

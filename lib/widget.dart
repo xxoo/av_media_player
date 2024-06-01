@@ -2,13 +2,13 @@ import 'package:flutter/widgets.dart';
 import 'player.dart';
 import 'utils.dart';
 
-/// This type is used by [AVMediaView], for sizing the video.
+/// This type is used by [AvMediaView], for sizing the video.
 enum SizingMode { free, keepAspectRatio, originalSize }
 
-/// The widget to display video for [AVMediaPlayer].
-class AVMediaView extends StatefulWidget {
-  final AVMediaPlayer? initPlayer;
-  final void Function(AVMediaPlayer player)? onCreated;
+/// The widget to display video for [AvMediaPlayer].
+class AvMediaView extends StatefulWidget {
+  final AvMediaPlayer? initPlayer;
+  final void Function(AvMediaPlayer player)? onCreated;
   final Color? backgroundColor;
   final SizingMode sizingMode;
   final String? initSource;
@@ -18,7 +18,7 @@ class AVMediaView extends StatefulWidget {
   final double? initSpeed;
   final int? initPosition;
 
-  /// Create a new [AVMediaView] widget.
+  /// Create a new [AvMediaView] widget.
   /// If [initPlayer] is null, a new player will be created.
   /// You can get the player from [onCreated] callback.
   ///
@@ -30,7 +30,7 @@ class AVMediaView extends StatefulWidget {
   ///
   /// Other parameters only take efferts at the time the widget is mounted.
   /// To changed them later, you need to call the corresponding methods of the player.
-  const AVMediaView({
+  const AvMediaView({
     super.key,
     this.initPlayer,
     this.initSource,
@@ -45,18 +45,18 @@ class AVMediaView extends StatefulWidget {
   });
 
   @override
-  State<AVMediaView> createState() => _AVMediaState();
+  State<AvMediaView> createState() => _AVMediaState();
 }
 
-class _AVMediaState extends State<AVMediaView> with SetStateAsync {
+class _AVMediaState extends State<AvMediaView> with SetStateAsync {
   bool _foreignPlayer = false;
-  AVMediaPlayer? _player;
+  AvMediaPlayer? _player;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initPlayer == null) {
-      _player = AVMediaPlayer(
+    if (widget.initPlayer == null || widget.initPlayer!.disposed) {
+      _player = AvMediaPlayer(
         initSource: widget.initSource,
         initAutoPlay: widget.initAutoPlay,
         initLooping: widget.initLooping,
@@ -93,7 +93,7 @@ class _AVMediaState extends State<AVMediaView> with SetStateAsync {
   }
 
   @override
-  void didUpdateWidget(AVMediaView oldWidget) {
+  void didUpdateWidget(AvMediaView oldWidget) {
     if (widget.sizingMode != oldWidget.sizingMode ||
         widget.backgroundColor != oldWidget.backgroundColor) {
       super.didUpdateWidget(oldWidget);
@@ -102,12 +102,10 @@ class _AVMediaState extends State<AVMediaView> with SetStateAsync {
 
   @override
   void dispose() {
-    if (_foreignPlayer) {
-      try {
-        _player?.videoSize.removeListener(_update);
-      } catch (_) {}
-    } else {
+    if (!_foreignPlayer) {
       _player?.dispose();
+    } else if (!_player!.disposed) {
+      _player?.videoSize.removeListener(_update);
     }
     super.dispose();
   }

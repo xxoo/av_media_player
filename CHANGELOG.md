@@ -1,3 +1,9 @@
+## 0.6.8
+
+- add Windows support.
+- **breaking change:** rename `AVMediaPlayer` class to `AvMediaPlayer`.
+- **breaking change:** rename `AVMediaView` class to `AvMediaView`.
+
 ## 0.6.7
 
 - support `asset://` scheme for local assets.

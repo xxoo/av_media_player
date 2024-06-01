@@ -10,7 +10,7 @@ class VideoPlayerView extends StatefulWidget {
 }
 
 class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
-  final AVMediaPlayer _player = AVMediaPlayer();
+  final AvMediaPlayer _player = AvMediaPlayer();
 
   @override
   initState() {
@@ -77,7 +77,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        AVMediaView(
+                        AvMediaView(
                           initPlayer: _player,
                           backgroundColor: Colors.black,
                           initSource: videoSources.first,
@@ -186,7 +186,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                   aspectRatio: 16 / 9,
                   child: GestureDetector(
                     onTap: () => _player.open(videoSources[index]),
-                    child: AVMediaView(
+                    child: AvMediaView(
                       initSource: videoSources[index],
                       backgroundColor: Colors.black,
                       sizingMode: SizingMode.free,
@@ -227,10 +227,11 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
     }
   }
 
+  String _twoDigits(int n) => n.toString().padLeft(2, '0');
+
   String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    final twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    final twoDigitMinutes = _twoDigits(duration.inMinutes.remainder(60));
+    final twoDigitSeconds = _twoDigits(duration.inSeconds.remainder(60));
     return '${duration.inHours > 0 ? '${duration.inHours}:' : ''}$twoDigitMinutes:$twoDigitSeconds';
   }
 }
