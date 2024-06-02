@@ -30,12 +30,10 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	}
 #endif
 
+	var id: Int64!
 	private let textureRegistry: FlutterTextureRegistry
 	private let avPlayer = AVPlayer()
-
-	var id: Int64!
 	private var eventChannel: FlutterEventChannel!
-
 	private var output: AVPlayerItemVideoOutput?
 	private var eventSink: FlutterEventSink?
 	private var watcher: Any?
@@ -218,12 +216,9 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			reading = nil
 			if let buffer = output?.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: nil) {
 				return Unmanaged.passRetained(buffer)
-			} else {
-				return nil
 			}
-		} else {
-			return nil
 		}
+		return nil
 	}
 
 	@objc private func onFinish(notification: NSNotification) {

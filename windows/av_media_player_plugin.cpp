@@ -39,7 +39,6 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	double volume = 1;
 	double speed = 1;
 	bool looping = false;
-	bool loading = false;
 	int64_t position = 0;
 	int64_t bufferPosition = 0;
 	uint32_t width = 0;
@@ -88,6 +87,7 @@ public:
 			d3dContext.put()
 		));
 		mediaPlayer.IsVideoFrameServerEnabled(true);
+		mediaPlayer.CommandManager().IsEnabled(false);
 	}
 
 	~AvMediaPlayer() {
@@ -179,9 +179,9 @@ public:
 						check_hresult(CreateDirect3D11SurfaceFromDXGISurface(dxgiSurface.get(), reinterpret_cast<IInspectable**>(put_abi(sharedThis->direct3DSurface))));
 					}
 					sharedThis->postMessage(EncodableValue(EncodableMap{
-						{EncodableValue("event"), EncodableValue("videoSize")},
-						{EncodableValue("width"), EncodableValue((double)sharedThis->width)},
-						{EncodableValue("height"), EncodableValue((double)sharedThis->height)}
+						{ EncodableValue("event"), EncodableValue("videoSize") },
+						{ EncodableValue("width"), EncodableValue((double)sharedThis->width) },
+						{ EncodableValue("height"), EncodableValue((double)sharedThis->height) }
 					}));
 				}
 			}
@@ -194,26 +194,39 @@ public:
 				if (position != sharedThis->position) {
 					sharedThis->position = position;
 					sharedThis->postMessage(EncodableValue(EncodableMap{
-						{EncodableValue("event"), EncodableValue("position")},
-						{EncodableValue("value"), EncodableValue(sharedThis->position)}
+						{ EncodableValue("event"), EncodableValue("position") },
+						{ EncodableValue("value"), EncodableValue(sharedThis->position) }
 					}));
 				}
 			}
 		});
 
-		playbackSession.PlaybackStateChanged([weakThis](MediaPlaybackSession playbackSession, auto) {
+		playbackSession.SeekCompleted([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr) {
-				auto loading = playbackSession.PlaybackState() == MediaPlaybackState::Buffering;
-				if (loading != sharedThis->loading) {
-					sharedThis->loading = loading;
-					if (sharedThis->state > 1) {
-						sharedThis->postMessage(EncodableValue(EncodableMap{
-							{EncodableValue("event"), EncodableValue("loading")},
-							{EncodableValue("value"), EncodableValue(sharedThis->loading)}
-						}));
-					}
-				}
+			if (sharedThis != nullptr && sharedThis->state > 1) {
+				sharedThis->postMessage(EncodableValue(EncodableMap{
+					{ EncodableValue("event"), EncodableValue("seekEnd") }
+				}));
+			}
+		});
+
+		playbackSession.BufferingStarted([weakThis](auto, auto) {
+			auto sharedThis = weakThis.lock();
+			if (sharedThis != nullptr && sharedThis->state > 1) {
+				sharedThis->postMessage(EncodableValue(EncodableMap{
+					{ EncodableValue("event"), EncodableValue("loading") },
+					{ EncodableValue("value"), EncodableValue(true) }
+				}));
+			}
+		});
+
+		playbackSession.BufferingEnded([weakThis](auto, auto) {
+			auto sharedThis = weakThis.lock();
+			if (sharedThis != nullptr && sharedThis->state > 1) {
+				sharedThis->postMessage(EncodableValue(EncodableMap{
+					{ EncodableValue("event"), EncodableValue("loading") },
+					{ EncodableValue("value"), EncodableValue(false) }
+				}));
 			}
 		});
 
@@ -230,9 +243,9 @@ public:
 						if (sharedThis->bufferPosition != t) {
 							sharedThis->bufferPosition = t;
 							sharedThis->postMessage(EncodableValue(EncodableMap{
-								{EncodableValue("event"), EncodableValue("buffer")},
-								{EncodableValue("begin"), EncodableValue(pos / 10000)},
-								{EncodableValue("end"), EncodableValue(sharedThis->bufferPosition)}
+								{ EncodableValue("event"), EncodableValue("buffer") },
+								{ EncodableValue("begin"), EncodableValue(pos / 10000) },
+								{ EncodableValue("end"), EncodableValue(sharedThis->bufferPosition) }
 							}));
 						}
 						break;
@@ -271,8 +284,8 @@ public:
 					break;
 				}
 				sharedThis->postMessage(EncodableValue(EncodableMap{
-					{EncodableValue("event"), EncodableValue("error")},
-					{EncodableValue("value"), message}
+					{ EncodableValue("event"), EncodableValue("error") },
+					{ EncodableValue("value"), message }
 				}));
 			}
 		});
@@ -290,9 +303,9 @@ public:
 				}
 				sharedThis->mediaPlayer.RealTimePlayback(duration == 0);
 				sharedThis->postMessage(EncodableValue(EncodableMap{
-					{EncodableValue("event"), EncodableValue("mediaInfo")},
-					{EncodableValue("duration"), EncodableValue(duration / 10000)},
-					{EncodableValue("source"), EncodableValue(sharedThis->source)}
+					{ EncodableValue("event"), EncodableValue("mediaInfo") },
+					{ EncodableValue("duration"), EncodableValue(duration / 10000) },
+					{ EncodableValue("source"), EncodableValue(sharedThis->source) }
 				}));
 			}
 		});
@@ -310,7 +323,7 @@ public:
 					sharedThis->bufferPosition = 0;
 				}
 				sharedThis->postMessage(EncodableValue(EncodableMap{
-					{EncodableValue("event"), EncodableValue("finished")}
+					{ EncodableValue("event"), EncodableValue("finished") }
 				}));
 			}
 		});

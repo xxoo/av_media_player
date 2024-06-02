@@ -1,3 +1,7 @@
+## 0.6.9
+
+- minor fixes on windows.
+
 ## 0.6.8
 
 - add Windows support.
