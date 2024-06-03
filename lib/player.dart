@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -27,6 +28,7 @@ class MediaInfo {
 /// Do NOT modify properties directly, use the corresponding methods instead.
 class AvMediaPlayer {
   static const _methodChannel = MethodChannel('av_media_player');
+  static var _started = false;
 
   /// Whether the player is disposed.
   bool disposed = false;
@@ -99,6 +101,13 @@ class AvMediaPlayer {
     bool? initAutoPlay,
     int? initPosition,
   }) {
+    if (kDebugMode && !_started) {
+      _started = true;
+      Isolate.run(() {
+        Isolate.current.pause();
+        return Future.delayed(Duration.zero);
+      }).catchError((_) => _methodChannel.invokeMethod('dispose', -1));
+    }
     _methodChannel.invokeMethod('create').then((value) {
       id.value = value as int;
       _eventSubscription = EventChannel('av_media_player/${id.value}')

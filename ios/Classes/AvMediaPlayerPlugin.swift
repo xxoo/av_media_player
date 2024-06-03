@@ -76,11 +76,9 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	}
 
 	func open(source: String) {
-		var uri: URL!
+		let uri: URL?
 		if source.starts(with: "asset://") {
-			if let path = Bundle.main.path(forResource: FlutterDartProject.lookupKey(forAsset: String(source.suffix(source.count - 8))), ofType: nil, inDirectory: nil) {
-				uri = URL(fileURLWithPath: path)
-			}
+			uri = URL(fileURLWithPath: Bundle.main.bundlePath + "/" + FlutterDartProject.lookupKey(forAsset: String(source.suffix(source.count - 8))))
 		} else if source.contains("://") {
 			uri = URL(string: source)
 		} else {
@@ -383,10 +381,13 @@ public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
 			result(player.id)
 		case "dispose":
 			result(nil)
-			if let id = call.arguments as? Int64,
-				let player = players[id] {
-				player.close()
-				players.removeValue(forKey: id)
+			if let id = call.arguments as? Int64 {
+				if id < 0 {
+					detachFromEngine(for: registrar)
+				} else {
+					players[id]?.close()
+					players.removeValue(forKey: id)
+				}
 			}
 		case "open":
 			result(nil)

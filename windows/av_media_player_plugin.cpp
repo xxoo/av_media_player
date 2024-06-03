@@ -437,7 +437,11 @@ public:
 			} else if (methodName == "dispose") {
 				result->Success(Null);
 				auto id = call.arguments()->LongValue();
-				players.erase(id);
+				if (id < 0) {
+					players.clear();
+				} else {
+					players.erase(id);
+				}
 			} else if (methodName == "open") {
 				result->Success(Null);
 				auto& args = get<EncodableMap>(*call.arguments());

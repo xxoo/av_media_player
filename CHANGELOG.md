@@ -1,3 +1,8 @@
+## 0.7.0
+
+- fixed `asset://` scheme issues on android and macos.
+- support hot restart on all platforms.
+
 ## 0.6.9
 
 - minor fixes on windows.

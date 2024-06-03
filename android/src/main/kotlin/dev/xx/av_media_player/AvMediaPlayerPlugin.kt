@@ -4,8 +4,9 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
-import android.view.Surface
+import android.content.res.AssetFileDescriptor
 import android.media.MediaPlayer
+import android.view.Surface
 import android.os.Handler
 import android.os.Looper
 import kotlin.math.max
@@ -31,6 +32,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	private var finished = false
 	private var hasVideo = false
 	private var source: String? = null
+	private var fd: AssetFileDescriptor? = null
 
 	init {
 		eventChannel.setStreamHandler(this)
@@ -158,7 +160,8 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 		}
 		try {
 			if (source.startsWith("asset://")) {
-				mediaPlayer.setDataSource(binding.applicationContext.assets.openFd(binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8))))
+				fd = binding.applicationContext.assets.openFd(binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8)))
+				mediaPlayer.setDataSource(fd!!)
 			} else {
 				mediaPlayer.setDataSource(source)
 			}
@@ -181,6 +184,8 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 		stillPreparing = false
 		mediaPlayer.setSurface(null)
 		mediaPlayer.reset()
+		fd?.close()
+		fd = null
 	}
 
 	fun play() {
@@ -260,23 +265,18 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	}
 }
 
-class AvMediaPlayerPlugin: FlutterPlugin, FlutterEngine.EngineLifecycleListener {
+class AvMediaPlayerPlugin: FlutterPlugin {
 	private lateinit var methodChannel: MethodChannel
 	private val players = mutableMapOf<Long, AvMediaPlayer>()
 
-	override fun onEngineWillDestroy() {
+	private fun clear() {
 		for (player in players.values) {
 			player.dispose()
 		}
 		players.clear()
 	}
 
-	override fun onPreEngineRestart() {
-		onEngineWillDestroy()
-	}
-
 	override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-		binding.flutterEngine.addEngineLifecycleListener(this)
 		methodChannel = MethodChannel(binding.binaryMessenger, "av_media_player")
 		methodChannel.setMethodCallHandler { call, result ->
 			when (call.method) {
@@ -288,8 +288,12 @@ class AvMediaPlayerPlugin: FlutterPlugin, FlutterEngine.EngineLifecycleListener 
 				"dispose" -> {
 					result.success(null)
 					val id = (call.arguments as Int).toLong()
-					players[id]?.dispose()
-					players.remove(id)
+					if (id < 0) {
+						clear()
+					} else {
+						players[id]?.dispose()
+						players.remove(id)
+					}
 				}
 				"open" -> {
 					result.success(null)
@@ -345,6 +349,6 @@ class AvMediaPlayerPlugin: FlutterPlugin, FlutterEngine.EngineLifecycleListener 
 
 	override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
 		methodChannel.setMethodCallHandler(null)
-		onEngineWillDestroy()
+		clear()
 	}
 }
