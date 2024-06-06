@@ -12,7 +12,7 @@ For api documentation please check [here](https://pub.dev/documentation/av_media
 
 ## Supported media formats
 
-It all depends on the platform's native components. But the following formats are generally supported:
+The full list depends on the platform's native components. But the following formats are generally supported:
 
 | Type              | Formats              |
 | ----------------- | -------------------- |
