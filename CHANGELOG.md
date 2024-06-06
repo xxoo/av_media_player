@@ -1,3 +1,6 @@
+## 0.7.1
+- optimize windows backend.
+
 ## 0.7.0
 
 - fixed `asset://` scheme issues on android and macos.

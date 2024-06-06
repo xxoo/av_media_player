@@ -24,7 +24,7 @@ class _AppViewState extends State<AppView> {
   Widget build(BuildContext context) => MaterialApp(
         home: Scaffold(
           appBar: AppBar(
-            title: const Text('av_media_player advanced example'),
+            title: const Text('AvMediaPlayer advanced example'),
           ),
           body: _buildBodyView(),
           bottomNavigationBar: BottomNavigationBar(

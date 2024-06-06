@@ -4,7 +4,6 @@
 #include <flutter/event_channel.h>
 #include <flutter/event_stream_handler_functions.h>
 #include <flutter/standard_method_codec.h>
-#include <dxgi.h>
 #include <d3d11.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 #include <dispatcherqueue.h>
@@ -23,7 +22,7 @@ using namespace winrt::Windows::Media::Playback;
 using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
 
 class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
-	static DispatcherQueueController dispatcherController;
+	static ID3D11Device* d3dDevice;
 	static DispatcherQueue dispatcherQueue;
 
 	EventChannel<EncodableValue>* eventChannel = nullptr;
@@ -32,7 +31,6 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	TextureRegistrar* textureRegistrar = nullptr;
 	FlutterDesktopGpuSurfaceDescriptor textureBuffer{};
 	MediaPlayer mediaPlayer = MediaPlayer();
-	com_ptr<ID3D11Device> d3dDevice;
 	IDirect3DSurface direct3DSurface;
 	string source = "";
 	uint8_t state = 0; //0: idle, 1: opening, 2: ready, 3: playing
@@ -41,11 +39,9 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	bool looping = false;
 	int64_t position = 0;
 	int64_t bufferPosition = 0;
-	uint32_t width = 0;
-	uint32_t height = 0;
 
 	// Helper function to post a message to the Flutter UI thread.
-	void postMessage(EncodableValue message) {
+	void postMessage(const EncodableValue& message) {
 		dispatcherQueue.TryEnqueue(DispatcherQueueHandler([weakThis = weak_from_this(), message]() {
 			auto sharedThis = weakThis.lock();
 			if (sharedThis != nullptr && sharedThis->eventSink.get() != nullptr) {
@@ -56,6 +52,8 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 
 public:
 	static void initGlobal() {
+		//init_apartment(apartment_type::single_threaded);
+		DispatcherQueueController dispatcherController{ nullptr };
 		check_hresult(CreateDispatcherQueueController(
 			DispatcherQueueOptions{
 				sizeof(DispatcherQueueOptions),
@@ -65,13 +63,6 @@ public:
 			(PDISPATCHERQUEUECONTROLLER*)put_abi(dispatcherController)
 		));
 		dispatcherQueue = dispatcherController.DispatcherQueue();
-	}
-
-	int64_t textureId = 0;
-
-	AvMediaPlayer() {
-		textureBuffer.struct_size = sizeof(FlutterDesktopGpuSurfaceDescriptor);
-		textureBuffer.format = kFlutterDesktopPixelFormatBGRA8888;
 		com_ptr<ID3D11DeviceContext> d3dContext;
 		D3D_FEATURE_LEVEL featureLevel{};
 		check_hresult(D3D11CreateDevice(
@@ -82,10 +73,26 @@ public:
 			nullptr,
 			0,
 			D3D11_SDK_VERSION,
-			d3dDevice.put(),
+			&d3dDevice,
 			&featureLevel,
 			d3dContext.put()
 		));
+	}
+
+	static void uninitGlobal() {
+		if (d3dDevice != nullptr) {
+			d3dDevice->Release();
+			d3dDevice = nullptr;
+		}
+		dispatcherQueue = nullptr;
+		//uninit_apartment();
+	}
+
+	int64_t textureId = 0;
+
+	AvMediaPlayer() {
+		textureBuffer.struct_size = sizeof(FlutterDesktopGpuSurfaceDescriptor);
+		textureBuffer.format = kFlutterDesktopPixelFormatBGRA8888;
 		mediaPlayer.IsVideoFrameServerEnabled(true);
 		mediaPlayer.CommandManager().IsEnabled(false);
 	}
@@ -113,7 +120,7 @@ public:
 			//kFlutterDesktopGpuSurfaceTypeD3d11Texture2D,
 			[weakThis](auto, auto) -> const FlutterDesktopGpuSurfaceDescriptor* {
 				auto sharedThis = weakThis.lock();
-				if (sharedThis != nullptr && sharedThis->state > 0 && sharedThis->width > 0 && sharedThis->height > 0) {
+				if (sharedThis != nullptr && sharedThis->direct3DSurface != nullptr) {
 					sharedThis->mediaPlayer.CopyFrameToVideoSurface(sharedThis->direct3DSurface);
 					return &sharedThis->textureBuffer;
 				} else {
@@ -150,12 +157,12 @@ public:
 		playbackSession.NaturalVideoSizeChanged([weakThis](MediaPlaybackSession playbackSession, auto) {
 			auto sharedThis = weakThis.lock();
 			if (sharedThis != nullptr && sharedThis->state > 0) {
-				auto w = playbackSession.NaturalVideoWidth();
-				auto h = playbackSession.NaturalVideoHeight();
-				if (w != sharedThis->width || h != sharedThis->height) {
-					sharedThis->width = w;
-					sharedThis->height = h;
-					if (sharedThis->width > 0 && sharedThis->height > 0) {
+				sharedThis->textureBuffer.visible_width = playbackSession.NaturalVideoWidth();
+				sharedThis->textureBuffer.visible_height = playbackSession.NaturalVideoHeight();
+				if (sharedThis->textureBuffer.width != sharedThis->textureBuffer.visible_width || sharedThis->textureBuffer.height != sharedThis->textureBuffer.visible_height) {
+					sharedThis->textureBuffer.width = sharedThis->textureBuffer.visible_width;
+					sharedThis->textureBuffer.height = sharedThis->textureBuffer.visible_height;
+					if (sharedThis->textureBuffer.width > 0 && sharedThis->textureBuffer.height > 0) {
 						D3D11_TEXTURE2D_DESC desc = {};
 						desc.ArraySize = 1;
 						desc.CPUAccessFlags = 0;
@@ -166,22 +173,25 @@ public:
 						desc.Usage = D3D11_USAGE_DEFAULT;
 						desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 						desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
-						sharedThis->textureBuffer.width = sharedThis->textureBuffer.visible_width = desc.Width = sharedThis->width;
-						sharedThis->textureBuffer.height = sharedThis->textureBuffer.visible_height = desc.Height = sharedThis->height;
+						desc.Width = (UINT)sharedThis->textureBuffer.width;
+						desc.Height = (UINT)sharedThis->textureBuffer.height;
 						com_ptr<ID3D11Texture2D> d3d11Texture;
 						check_hresult(sharedThis->d3dDevice->CreateTexture2D(&desc, nullptr, d3d11Texture.put()));
 						//sharedThis->textureBuffer.handle = d3d11Texture.get();
 						com_ptr<IDXGIResource> resource;
 						d3d11Texture.as(resource);
-						check_hresult(resource->GetSharedHandle((HANDLE*)&sharedThis->textureBuffer.handle));
+						check_hresult(resource->GetSharedHandle(&sharedThis->textureBuffer.handle));
 						com_ptr<IDXGISurface> dxgiSurface;
 						d3d11Texture.as(dxgiSurface);
 						check_hresult(CreateDirect3D11SurfaceFromDXGISurface(dxgiSurface.get(), reinterpret_cast<IInspectable**>(put_abi(sharedThis->direct3DSurface))));
+					} else {
+						sharedThis->textureBuffer.handle = nullptr;
+						sharedThis->direct3DSurface = nullptr;
 					}
 					sharedThis->postMessage(EncodableValue(EncodableMap{
 						{ EncodableValue("event"), EncodableValue("videoSize") },
-						{ EncodableValue("width"), EncodableValue((double)sharedThis->width) },
-						{ EncodableValue("height"), EncodableValue((double)sharedThis->height) }
+						{ EncodableValue("width"), EncodableValue((double)sharedThis->textureBuffer.width) },
+						{ EncodableValue("height"), EncodableValue((double)sharedThis->textureBuffer.height) }
 					}));
 				}
 			}
@@ -256,7 +266,7 @@ public:
 
 		mediaPlayer.VideoFrameAvailable([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state > 0 && sharedThis->width > 0 && sharedThis->height > 0) {
+			if (sharedThis != nullptr && sharedThis->direct3DSurface != nullptr) {
 				sharedThis->textureRegistrar->MarkTextureFrameAvailable(sharedThis->textureId);
 			}
 		});
@@ -356,8 +366,9 @@ public:
 
 	void close() {
 		state = 0;
-		width = 0;
-		height = 0;
+		textureBuffer.width = textureBuffer.height = textureBuffer.visible_width = textureBuffer.visible_height = 0;
+		textureBuffer.handle = nullptr;
+		direct3DSurface = nullptr;
 		position = 0;
 		bufferPosition = 0;
 		source = "";
@@ -407,7 +418,7 @@ public:
 		looping = loop;
 	}
 };
-DispatcherQueueController AvMediaPlayer::dispatcherController{ nullptr };
+ID3D11Device* AvMediaPlayer::d3dDevice = nullptr;
 DispatcherQueue AvMediaPlayer::dispatcherQueue{ nullptr };
 
 class AvMediaPlayerPlugin : public Plugin {
@@ -419,7 +430,6 @@ class AvMediaPlayerPlugin : public Plugin {
 
 public:
 	AvMediaPlayerPlugin(PluginRegistrarWindows* registrar) {
-		//init_apartment(apartment_type::single_threaded);
 		AvMediaPlayer::initGlobal();
 		methodChannel = new MethodChannel<EncodableValue>(
 			registrar->messenger(),
@@ -518,7 +528,7 @@ public:
 		players.clear();
 		methodChannel->SetMethodCallHandler(nullptr);
 		delete methodChannel;
-		//uninit_apartment();
+		AvMediaPlayer::uninitGlobal();
 	}
 
 	AvMediaPlayerPlugin(const AvMediaPlayerPlugin&) = delete;

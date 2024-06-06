@@ -28,7 +28,7 @@ class MediaInfo {
 /// Do NOT modify properties directly, use the corresponding methods instead.
 class AvMediaPlayer {
   static const _methodChannel = MethodChannel('av_media_player');
-  static var _started = false;
+  static var _detectorStarted = false;
 
   /// Whether the player is disposed.
   bool disposed = false;
@@ -101,12 +101,17 @@ class AvMediaPlayer {
     bool? initAutoPlay,
     int? initPosition,
   }) {
-    if (kDebugMode && !_started) {
-      _started = true;
-      Isolate.run(() {
-        Isolate.current.pause();
-        return Future.delayed(Duration.zero);
-      }).catchError((_) => _methodChannel.invokeMethod('dispose', -1));
+    if (kDebugMode && !_detectorStarted) {
+      _detectorStarted = true;
+      final receivePort = ReceivePort();
+      receivePort.listen((_) => _methodChannel.invokeMethod('dispose', -1));
+      Isolate.spawn(
+        (_) {},
+        null,
+        paused: true,
+        onExit: receivePort.sendPort,
+        debugName: 'AvMediaPlayer restart detector',
+      );
     }
     _methodChannel.invokeMethod('create').then((value) {
       id.value = value as int;

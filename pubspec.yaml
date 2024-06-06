@@ -1,6 +1,6 @@
 name: av_media_player
 description: "A lightweight media player for flutter that builds on system components. Video rendering in Texture widget."
-version: 0.7.0
+version: 0.7.1
 repository: "https://github.com/xxoo/av_media_player"
 issue_tracker: "https://github.com/xxoo/av_media_player/issues"
 topics:
