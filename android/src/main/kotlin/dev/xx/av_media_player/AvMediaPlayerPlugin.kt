@@ -1,6 +1,5 @@
 package dev.xx.av_media_player
 
-import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
@@ -287,10 +286,10 @@ class AvMediaPlayerPlugin: FlutterPlugin {
 				}
 				"dispose" -> {
 					result.success(null)
-					val id = (call.arguments as Int).toLong()
-					if (id < 0) {
+					if (call.arguments == null) {
 						clear()
 					} else {
+						val id = (call.arguments as Int).toLong()
 						players[id]?.dispose()
 						players.remove(id)
 					}

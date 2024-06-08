@@ -56,8 +56,8 @@ class _VideoListView extends State<VideoListView> with SetStateAsync {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // We can use Texture widget instead of AVPlayerView to display video.
-                  // But we have to make sure the player is initialized before doing that. (_players[index].id.value != null)
+                  // We can use Texture widget instead of AvMediaView to display video.
+                  // But we have to make sure the player is initialized first. (_players[index].id.value != null)
                   // In this case we check _players[index].videoSize.value != Size.zero which also guarantees the player is initialized.
                   _players[index].videoSize.value != Size.zero
                       ? Texture(textureId: _players[index].id.value!)

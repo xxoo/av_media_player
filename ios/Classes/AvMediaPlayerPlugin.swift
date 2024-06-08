@@ -382,12 +382,10 @@ public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
 		case "dispose":
 			result(nil)
 			if let id = call.arguments as? Int64 {
-				if id < 0 {
-					detachFromEngine(for: registrar)
-				} else {
-					players[id]?.close()
-					players.removeValue(forKey: id)
-				}
+				players[id]?.close()
+				players.removeValue(forKey: id)
+			} else {
+				detachFromEngine(for: registrar)
 			}
 		case "open":
 			result(nil)

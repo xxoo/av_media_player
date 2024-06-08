@@ -41,7 +41,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	int64_t bufferPosition = 0;
 
 	// Helper function to post a message to the Flutter UI thread.
-	void postMessage(const EncodableValue& message) {
+	void postMessage(const EncodableMap& message) {
 		dispatcherQueue.TryEnqueue(DispatcherQueueHandler([weakThis = weak_from_this(), message]() {
 			auto sharedThis = weakThis.lock();
 			if (sharedThis != nullptr && sharedThis->eventSink.get() != nullptr) {
@@ -112,9 +112,9 @@ public:
 		}
 	}
 
-	void init(PluginRegistrarWindows* registrar) {
+	void init(PluginRegistrarWindows& registrar) {
 		auto weakThis = weak_from_this();
-		textureRegistrar = registrar->texture_registrar();
+		textureRegistrar = registrar.texture_registrar();
 		texture = new TextureVariant(GpuSurfaceTexture(
 			kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle,
 			//kFlutterDesktopGpuSurfaceTypeD3d11Texture2D,
@@ -132,7 +132,7 @@ public:
 		char id[32];
 		sprintf_s(id, "av_media_player/%lld", textureId);
 		eventChannel = new EventChannel<EncodableValue>(
-			registrar->messenger(),
+			registrar.messenger(),
 			id,
 			&StandardMethodCodec::GetInstance()
 		);
@@ -188,11 +188,11 @@ public:
 						sharedThis->textureBuffer.handle = nullptr;
 						sharedThis->direct3DSurface = nullptr;
 					}
-					sharedThis->postMessage(EncodableValue(EncodableMap{
+					sharedThis->postMessage(EncodableMap{
 						{ EncodableValue("event"), EncodableValue("videoSize") },
 						{ EncodableValue("width"), EncodableValue((double)sharedThis->textureBuffer.width) },
 						{ EncodableValue("height"), EncodableValue((double)sharedThis->textureBuffer.height) }
-					}));
+					});
 				}
 			}
 		});
@@ -203,10 +203,10 @@ public:
 				auto position = playbackSession.Position().count() / 10000;
 				if (position != sharedThis->position) {
 					sharedThis->position = position;
-					sharedThis->postMessage(EncodableValue(EncodableMap{
+					sharedThis->postMessage(EncodableMap{
 						{ EncodableValue("event"), EncodableValue("position") },
 						{ EncodableValue("value"), EncodableValue(sharedThis->position) }
-					}));
+					});
 				}
 			}
 		});
@@ -214,29 +214,29 @@ public:
 		playbackSession.SeekCompleted([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
 			if (sharedThis != nullptr && sharedThis->state > 1) {
-				sharedThis->postMessage(EncodableValue(EncodableMap{
+				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("seekEnd") }
-				}));
+				});
 			}
 		});
 
 		playbackSession.BufferingStarted([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
 			if (sharedThis != nullptr && sharedThis->state > 1) {
-				sharedThis->postMessage(EncodableValue(EncodableMap{
+				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("loading") },
 					{ EncodableValue("value"), EncodableValue(true) }
-				}));
+				});
 			}
 		});
 
 		playbackSession.BufferingEnded([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
 			if (sharedThis != nullptr && sharedThis->state > 1) {
-				sharedThis->postMessage(EncodableValue(EncodableMap{
+				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("loading") },
 					{ EncodableValue("value"), EncodableValue(false) }
-				}));
+				});
 			}
 		});
 
@@ -252,11 +252,11 @@ public:
 						int64_t t = end / 10000;
 						if (sharedThis->bufferPosition != t) {
 							sharedThis->bufferPosition = t;
-							sharedThis->postMessage(EncodableValue(EncodableMap{
+							sharedThis->postMessage(EncodableMap{
 								{ EncodableValue("event"), EncodableValue("buffer") },
 								{ EncodableValue("begin"), EncodableValue(pos / 10000) },
 								{ EncodableValue("end"), EncodableValue(sharedThis->bufferPosition) }
-							}));
+							});
 						}
 						break;
 					}
@@ -293,10 +293,10 @@ public:
 					message = EncodableValue("Unknown");
 					break;
 				}
-				sharedThis->postMessage(EncodableValue(EncodableMap{
+				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("error") },
 					{ EncodableValue("value"), message }
-				}));
+				});
 			}
 		});
 
@@ -312,11 +312,11 @@ public:
 					duration = 0;
 				}
 				sharedThis->mediaPlayer.RealTimePlayback(duration == 0);
-				sharedThis->postMessage(EncodableValue(EncodableMap{
+				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("mediaInfo") },
 					{ EncodableValue("duration"), EncodableValue(duration / 10000) },
 					{ EncodableValue("source"), EncodableValue(sharedThis->source) }
-				}));
+				});
 			}
 		});
 
@@ -332,9 +332,9 @@ public:
 					sharedThis->position = 0;
 					sharedThis->bufferPosition = 0;
 				}
-				sharedThis->postMessage(EncodableValue(EncodableMap{
+				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("finished") }
-				}));
+				});
 			}
 		});
 	}
@@ -426,18 +426,17 @@ class AvMediaPlayerPlugin : public Plugin {
 	map<int64_t, shared_ptr<AvMediaPlayer>> players;
 	EncodableValue Id = EncodableValue("id");
 	EncodableValue Value = EncodableValue("value");
-	EncodableValue Null = EncodableValue(monostate{});
 
 public:
-	AvMediaPlayerPlugin(PluginRegistrarWindows* registrar) {
+	AvMediaPlayerPlugin(PluginRegistrarWindows& registrar) {
 		AvMediaPlayer::initGlobal();
 		methodChannel = new MethodChannel<EncodableValue>(
-			registrar->messenger(),
+			registrar.messenger(),
 			"av_media_player",
 			&StandardMethodCodec::GetInstance()
 		);
 
-		methodChannel->SetMethodCallHandler([&, registrar](const MethodCall<EncodableValue>& call, unique_ptr<MethodResult<EncodableValue>> result) {
+		methodChannel->SetMethodCallHandler([&](const MethodCall<EncodableValue>& call, unique_ptr<MethodResult<EncodableValue>> result) {
 			auto& methodName = call.method_name();
 			if (methodName == "create") {
 				auto player = make_shared<AvMediaPlayer>();
@@ -445,79 +444,41 @@ public:
 				players[player->textureId] = player;
 				result->Success(EncodableValue(player->textureId));
 			} else if (methodName == "dispose") {
-				result->Success(Null);
-				auto id = call.arguments()->LongValue();
-				if (id < 0) {
+				result->Success();
+				if (call.arguments()->IsNull()) {
 					players.clear();
 				} else {
-					players.erase(id);
+					players.erase(call.arguments()->LongValue());
 				}
 			} else if (methodName == "open") {
-				result->Success(Null);
+				result->Success();
 				auto& args = get<EncodableMap>(*call.arguments());
-				auto& value = get<string>(args.at(Value));
-				auto id = args.at(Id).LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->open(value);
-				}
+				players[args.at(Id).LongValue()]->open(get<string>(args.at(Value)));
 			} else if (methodName == "close") {
-				result->Success(Null);
-				auto id = call.arguments()->LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->close();
-				}
+				result->Success();
+				players[call.arguments()->LongValue()]->close();
 			} else if (methodName == "play") {
-				result->Success(Null);
-				auto id = call.arguments()->LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->play();
-				}
+				result->Success();
+				players[call.arguments()->LongValue()]->play();
 			} else if (methodName == "pause") {
-				result->Success(Null);
-				auto id = call.arguments()->LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->pause();
-				}
+				result->Success();
+				players[call.arguments()->LongValue()]->pause();
 			} else if (methodName == "seekTo") {
-				result->Success(Null);
+				result->Success();
 				auto& args = get<EncodableMap>(*call.arguments());
-				auto value = args.at(Value).LongValue();
-				auto id = args.at(Id).LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->seekTo(value);
-				}
+				players[args.at(Id).LongValue()]->seekTo(args.at(Value).LongValue());
 			} else if (methodName == "setVolume") {
-				result->Success(Null);
+				result->Success();
 				auto& args = get<EncodableMap>(*call.arguments());
-				auto value = get<double>(args.at(Value));
-				auto id = args.at(Id).LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->setVolume(value);
-				}
+				players[args.at(Id).LongValue()]->setVolume(get<double>(args.at(Value)));
 			} else if (methodName == "setSpeed") {
-				result->Success(Null);
+				result->Success();
 				auto& args = get<EncodableMap>(*call.arguments());
-				auto value = get<double>(args.at(Value));
-				auto id = args.at(Id).LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->setSpeed(value);
-				}
+				players[args.at(Id).LongValue()]->setSpeed(get<double>(args.at(Value)));
 			} else if (methodName == "setLooping") {
-				result->Success(Null);
+				result->Success();
 				auto& args = get<EncodableMap>(*call.arguments());
-				auto value = get<bool>(args.at(Value));
-				auto id = args.at(Id).LongValue();
-				auto& player = players[id];
-				if (player != nullptr) {
-					player->setLooping(value);
-				}
+				players[args.at(Id).LongValue()]->setLooping(get<bool>(args.at(Value)));
 			} else {
 				result->NotImplemented();
 			}
@@ -536,6 +497,6 @@ public:
 };
 
 void AvMediaPlayerPluginCApiRegisterWithRegistrar(FlutterDesktopPluginRegistrarRef registrarRef) {
-	auto registrar = PluginRegistrarManager::GetInstance()->GetRegistrar<PluginRegistrarWindows>(registrarRef);
-	registrar->AddPlugin(make_unique<AvMediaPlayerPlugin>(registrar));
+	auto& registrar = *PluginRegistrarManager::GetInstance()->GetRegistrar<PluginRegistrarWindows>(registrarRef);
+	registrar.AddPlugin(make_unique<AvMediaPlayerPlugin>(registrar));
 }

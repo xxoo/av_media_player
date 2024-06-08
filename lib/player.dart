@@ -31,7 +31,7 @@ class AvMediaPlayer {
   static var _detectorStarted = false;
 
   /// Whether the player is disposed.
-  bool disposed = false;
+  var disposed = false;
 
   /// The id of the player. It's null before the player is initialized.
   /// After the player is initialized it will be unique and never change again.
@@ -90,7 +90,7 @@ class AvMediaPlayer {
   StreamSubscription? _eventSubscription;
   String? _source;
   int? _position;
-  bool _seeked = false;
+  var _seeked = false;
 
   /// All the parameters are optional, and can be changed later by calling the corresponding methods.
   AvMediaPlayer({
@@ -104,7 +104,7 @@ class AvMediaPlayer {
     if (kDebugMode && !_detectorStarted) {
       _detectorStarted = true;
       final receivePort = ReceivePort();
-      receivePort.listen((_) => _methodChannel.invokeMethod('dispose', -1));
+      receivePort.listen((_) => _methodChannel.invokeMethod('dispose'));
       Isolate.spawn(
         (_) {},
         null,
@@ -114,113 +114,117 @@ class AvMediaPlayer {
       );
     }
     _methodChannel.invokeMethod('create').then((value) {
-      id.value = value as int;
-      _eventSubscription = EventChannel('av_media_player/${id.value}')
-          .receiveBroadcastStream()
-          .listen((event) {
-        final e = event as Map;
-        if (e['event'] == 'mediaInfo') {
-          if (_source == e['source']) {
-            loading.value = false;
-            playbackState.value = PlaybackState.paused;
-            mediaInfo.value = MediaInfo(e['duration'], _source!);
-            if (autoPlay.value) {
-              play();
+      if (disposed) {
+        _methodChannel.invokeMethod('dispose', value);
+      } else {
+        id.value = value as int;
+        _eventSubscription = EventChannel('av_media_player/${id.value}')
+            .receiveBroadcastStream()
+            .listen((event) {
+          final e = event as Map;
+          if (e['event'] == 'mediaInfo') {
+            if (_source == e['source']) {
+              loading.value = false;
+              playbackState.value = PlaybackState.paused;
+              mediaInfo.value = MediaInfo(e['duration'], _source!);
+              if (autoPlay.value) {
+                play();
+              }
+              if (_position != null) {
+                seekTo(_position!);
+                _position = null;
+              }
             }
-            if (_position != null) {
-              seekTo(_position!);
-              _position = null;
+          } else if (e['event'] == 'videoSize') {
+            if (playbackState.value != PlaybackState.closed || loading.value) {
+              final width = e['width'] as double;
+              final height = e['height'] as double;
+              if (width != videoSize.value.width ||
+                  height != videoSize.value.height) {
+                videoSize.value = width > 0 && height > 0
+                    ? Size(e['width'], e['height'])
+                    : Size.zero;
+              }
             }
-          }
-        } else if (e['event'] == 'videoSize') {
-          if (playbackState.value != PlaybackState.closed || loading.value) {
-            final width = e['width'] as double;
-            final height = e['height'] as double;
-            if (width != videoSize.value.width ||
-                height != videoSize.value.height) {
-              videoSize.value = width > 0 && height > 0
-                  ? Size(e['width'], e['height'])
-                  : Size.zero;
+          } else if (e['event'] == 'playbackState') {
+            playbackState.value = e['value'] == 'playing'
+                ? PlaybackState.playing
+                : e['value'] == 'paused'
+                    ? PlaybackState.paused
+                    : PlaybackState.closed;
+          } else if (e['event'] == 'position') {
+            if (mediaInfo.value != null) {
+              position.value = e['value'] > mediaInfo.value!.duration
+                  ? mediaInfo.value!.duration
+                  : e['value'] < 0
+                      ? 0
+                      : e['value'];
             }
-          }
-        } else if (e['event'] == 'playbackState') {
-          playbackState.value = e['value'] == 'playing'
-              ? PlaybackState.playing
-              : e['value'] == 'paused'
-                  ? PlaybackState.paused
-                  : PlaybackState.closed;
-        } else if (e['event'] == 'position') {
-          if (mediaInfo.value != null) {
-            position.value = e['value'] > mediaInfo.value!.duration
-                ? mediaInfo.value!.duration
-                : e['value'] < 0
-                    ? 0
-                    : e['value'];
-          }
-        } else if (e['event'] == 'buffer') {
-          if (mediaInfo.value != null) {
-            final begin = e['begin'] as int;
-            final end = e['end'] as int;
-            bufferRange.value = begin == 0 && end == 0
-                ? BufferRange.empty
-                : BufferRange(begin, end);
-          }
-        } else if (e['event'] == 'error') {
-          //ignore errors when player is closed
-          if (playbackState.value != PlaybackState.closed || loading.value) {
-            _source = null;
-            error.value = e['value'];
-            mediaInfo.value = null;
-            videoSize.value = Size.zero;
-            position.value = 0;
-            bufferRange.value = BufferRange.empty;
-            finishedTimes.value = 0;
-            loading.value = false;
-            playbackState.value = PlaybackState.closed;
-          }
-        } else if (e['event'] == 'loading') {
-          if (mediaInfo.value != null) {
-            loading.value = e['value'];
-          }
-        } else if (e['event'] == 'seekEnd') {
-          if (mediaInfo.value != null) {
-            _seeked = false;
-            loading.value = false;
-          }
-        } else if (e['event'] == 'finished') {
-          if (mediaInfo.value != null) {
-            if (!looping.value && mediaInfo.value!.duration != 0) {
+          } else if (e['event'] == 'buffer') {
+            if (mediaInfo.value != null) {
+              final begin = e['begin'] as int;
+              final end = e['end'] as int;
+              bufferRange.value = begin == 0 && end == 0
+                  ? BufferRange.empty
+                  : BufferRange(begin, end);
+            }
+          } else if (e['event'] == 'error') {
+            //ignore errors when player is closed
+            if (playbackState.value != PlaybackState.closed || loading.value) {
+              _source = null;
+              error.value = e['value'];
+              mediaInfo.value = null;
+              videoSize.value = Size.zero;
               position.value = 0;
               bufferRange.value = BufferRange.empty;
-              playbackState.value = PlaybackState.paused;
-            }
-            finishedTimes.value += 1;
-            if (mediaInfo.value!.duration == 0) {
+              finishedTimes.value = 0;
+              loading.value = false;
               playbackState.value = PlaybackState.closed;
             }
+          } else if (e['event'] == 'loading') {
+            if (mediaInfo.value != null) {
+              loading.value = e['value'];
+            }
+          } else if (e['event'] == 'seekEnd') {
+            if (mediaInfo.value != null) {
+              _seeked = false;
+              loading.value = false;
+            }
+          } else if (e['event'] == 'finished') {
+            if (mediaInfo.value != null) {
+              if (!looping.value && mediaInfo.value!.duration != 0) {
+                position.value = 0;
+                bufferRange.value = BufferRange.empty;
+                playbackState.value = PlaybackState.paused;
+              }
+              finishedTimes.value += 1;
+              if (mediaInfo.value!.duration == 0) {
+                playbackState.value = PlaybackState.closed;
+              }
+            }
           }
+        });
+        if (_source != null) {
+          open(_source!);
         }
-      });
-      if (_source != null) {
-        open(_source!);
-      }
-      if (volume.value != 1) {
-        _methodChannel.invokeMethod('setVolume', {
-          'id': value,
-          'value': volume.value,
-        });
-      }
-      if (speed.value != 1) {
-        _methodChannel.invokeMethod('setSpeed', {
-          'id': value,
-          'value': speed.value,
-        });
-      }
-      if (looping.value) {
-        _methodChannel.invokeMethod('setLooping', {
-          'id': value,
-          'value': true,
-        });
+        if (volume.value != 1) {
+          _methodChannel.invokeMethod('setVolume', {
+            'id': value,
+            'value': volume.value,
+          });
+        }
+        if (speed.value != 1) {
+          _methodChannel.invokeMethod('setSpeed', {
+            'id': value,
+            'value': speed.value,
+          });
+        }
+        if (looping.value) {
+          _methodChannel.invokeMethod('setLooping', {
+            'id': value,
+            'value': true,
+          });
+        }
       }
     });
     _position = initPosition;
@@ -245,8 +249,10 @@ class AvMediaPlayer {
   void dispose() {
     if (!disposed) {
       disposed = true;
+      if (id.value != null) {
+        _methodChannel.invokeMethod('dispose', id.value);
+      }
       _eventSubscription?.cancel();
-      _methodChannel.invokeMethod('dispose', id.value);
       id.dispose();
       mediaInfo.dispose();
       videoSize.dispose();
@@ -266,44 +272,48 @@ class AvMediaPlayer {
   ///
   /// source: The url or local path of the media file
   void open(String source) {
-    _source = source;
-    if (id.value != null) {
-      error.value = null;
-      mediaInfo.value = null;
-      videoSize.value = Size.zero;
-      position.value = 0;
-      bufferRange.value = BufferRange.empty;
-      finishedTimes.value = 0;
-      playbackState.value = PlaybackState.closed;
-      _methodChannel.invokeMethod('open', {
-        'id': id.value,
-        'value': source,
-      });
+    if (!disposed) {
+      _source = source;
+      if (id.value != null) {
+        error.value = null;
+        mediaInfo.value = null;
+        videoSize.value = Size.zero;
+        position.value = 0;
+        bufferRange.value = BufferRange.empty;
+        finishedTimes.value = 0;
+        playbackState.value = PlaybackState.closed;
+        _methodChannel.invokeMethod('open', {
+          'id': id.value,
+          'value': source,
+        });
+      }
+      loading.value = true;
     }
-    loading.value = true;
   }
 
   /// Close or stop opening the media file.
   void close() {
-    _source = null;
-    if (id.value != null &&
-        (playbackState.value != PlaybackState.closed || loading.value)) {
-      _methodChannel.invokeMethod('close', id.value);
-      mediaInfo.value = null;
-      videoSize.value = Size.zero;
-      position.value = 0;
-      bufferRange.value = BufferRange.empty;
-      finishedTimes.value = 0;
-      playbackState.value = PlaybackState.closed;
+    if (!disposed) {
+      _source = null;
+      if (id.value != null &&
+          (playbackState.value != PlaybackState.closed || loading.value)) {
+        _methodChannel.invokeMethod('close', id.value);
+        mediaInfo.value = null;
+        videoSize.value = Size.zero;
+        position.value = 0;
+        bufferRange.value = BufferRange.empty;
+        finishedTimes.value = 0;
+        playbackState.value = PlaybackState.closed;
+      }
+      loading.value = false;
     }
-    loading.value = false;
   }
 
   /// Play the current media file.
   ///
   /// If the the player is opening a media file, calling this method will set autoplay to true
   bool play() {
-    if (speed.value > 0) {
+    if (!disposed) {
       if (id.value != null && playbackState.value == PlaybackState.paused) {
         _methodChannel.invokeMethod('play', id.value);
         playbackState.value = PlaybackState.playing;
@@ -322,18 +332,20 @@ class AvMediaPlayer {
   ///
   /// If the the player is opening a media file, calling this method will set autoplay to false
   bool pause() {
-    if (id.value != null && playbackState.value == PlaybackState.playing) {
-      _methodChannel.invokeMethod('pause', id.value);
-      playbackState.value = PlaybackState.paused;
-      if (!_seeked) {
-        loading.value = false;
+    if (!disposed) {
+      if (id.value != null && playbackState.value == PlaybackState.playing) {
+        _methodChannel.invokeMethod('pause', id.value);
+        playbackState.value = PlaybackState.paused;
+        if (!_seeked) {
+          loading.value = false;
+        }
+        return true;
+      } else if (autoPlay.value &&
+          playbackState.value == PlaybackState.closed &&
+          _source != null) {
+        setAutoPlay(false);
+        return true;
       }
-      return true;
-    } else if (autoPlay.value &&
-        playbackState.value == PlaybackState.closed &&
-        _source != null) {
-      setAutoPlay(false);
-      return true;
     }
     return false;
   }
@@ -342,7 +354,7 @@ class AvMediaPlayer {
   ///
   /// position: The position to seek to in milliseconds.
   bool seekTo(int position) {
-    if (id.value != null) {
+    if (!disposed && id.value != null) {
       if (mediaInfo.value != null) {
         if (position < 0) {
           position = 0;
@@ -368,18 +380,20 @@ class AvMediaPlayer {
   ///
   /// volume: The volume to set between 0 and 1.
   bool setVolume(double volume) {
-    if (volume < 0) {
-      volume = 0;
-    } else if (volume > 1) {
-      volume = 1;
-    }
-    if (this.volume.value != volume) {
-      _methodChannel.invokeMethod('setVolume', {
-        'id': id.value,
-        'value': volume,
-      });
-      this.volume.value = volume;
-      return true;
+    if (!disposed) {
+      if (volume < 0) {
+        volume = 0;
+      } else if (volume > 1) {
+        volume = 1;
+      }
+      if (this.volume.value != volume) {
+        _methodChannel.invokeMethod('setVolume', {
+          'id': id.value,
+          'value': volume,
+        });
+        this.volume.value = volume;
+        return true;
+      }
     }
     return false;
   }
@@ -388,27 +402,29 @@ class AvMediaPlayer {
   ///
   /// speed: The speed to set between 0.5 and 2.
   bool setSpeed(double speed) {
-    if (speed < 0.5) {
-      speed = 0.5;
-    } else if (speed > 2) {
-      speed = 2;
-    }
-    if (this.speed.value != speed) {
-      if (id.value != null) {
-        _methodChannel.invokeMethod('setSpeed', {
-          'id': id.value,
-          'value': speed,
-        });
+    if (!disposed) {
+      if (speed < 0.5) {
+        speed = 0.5;
+      } else if (speed > 2) {
+        speed = 2;
       }
-      this.speed.value = speed;
-      return true;
+      if (this.speed.value != speed) {
+        if (id.value != null) {
+          _methodChannel.invokeMethod('setSpeed', {
+            'id': id.value,
+            'value': speed,
+          });
+        }
+        this.speed.value = speed;
+        return true;
+      }
     }
     return false;
   }
 
   /// Set whether the player should loop the media.
   bool setLooping(bool looping) {
-    if (looping != this.looping.value) {
+    if (!disposed && looping != this.looping.value) {
       if (id.value != null) {
         _methodChannel.invokeMethod('setLooping', {
           'id': id.value,
@@ -423,7 +439,7 @@ class AvMediaPlayer {
 
   /// Set whether the player should play the media automatically.
   bool setAutoPlay(bool autoPlay) {
-    if (autoPlay != this.autoPlay.value) {
+    if (!disposed && autoPlay != this.autoPlay.value) {
       this.autoPlay.value = autoPlay;
       return true;
     }

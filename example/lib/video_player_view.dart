@@ -143,7 +143,16 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                             _player.seekTo(_player.position.value + 5000),
                       ),
                       const Spacer(),
-                      _buildPlaybackStatusView(),
+                      Icon(
+                        _player.playbackState.value == PlaybackState.playing
+                            ? Icons.play_arrow
+                            : _player.playbackState.value ==
+                                    PlaybackState.paused
+                                ? Icons.pause
+                                : Icons.stop,
+                        size: 16.0,
+                        color: const Color(0x80000000),
+                      ),
                     ],
                   ),
                   Row(
@@ -202,36 +211,10 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
         ),
       );
 
-  Widget _buildPlaybackStatusView() {
-    const size = 16.0;
-    const color = Color(0x80000000);
-    switch (_player.playbackState.value) {
-      case PlaybackState.playing:
-        return const Icon(
-          Icons.play_arrow,
-          size: size,
-          color: color,
-        );
-      case PlaybackState.paused:
-        return const Icon(
-          Icons.pause,
-          size: size,
-          color: color,
-        );
-      case PlaybackState.closed:
-        return const Icon(
-          Icons.stop,
-          size: size,
-          color: color,
-        );
-    }
-  }
-
-  String _twoDigits(int n) => n.toString().padLeft(2, '0');
-
   String _formatDuration(Duration duration) {
-    final twoDigitMinutes = _twoDigits(duration.inMinutes.remainder(60));
-    final twoDigitSeconds = _twoDigits(duration.inSeconds.remainder(60));
-    return '${duration.inHours > 0 ? '${duration.inHours}:' : ''}$twoDigitMinutes:$twoDigitSeconds';
+    final hours = duration.inHours > 0 ? '${duration.inHours}:' : '';
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours$minutes:$seconds';
   }
 }

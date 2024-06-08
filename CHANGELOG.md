@@ -1,4 +1,9 @@
+## 0.7.2
+
+- prevent calling backend while player is disposed in dart side.
+
 ## 0.7.1
+
 - optimize windows backend.
 
 ## 0.7.0

@@ -26,7 +26,9 @@ class _AppViewState extends State<AppView> {
           appBar: AppBar(
             title: const Text('AvMediaPlayer advanced example'),
           ),
-          body: _buildBodyView(),
+          body: _appRoute == AppRoute.videoPlayer
+              ? const VideoPlayerView()
+              : const VideoListView(),
           bottomNavigationBar: BottomNavigationBar(
             items: const [
               BottomNavigationBarItem(
@@ -44,13 +46,4 @@ class _AppViewState extends State<AppView> {
           ),
         ),
       );
-
-  Widget _buildBodyView() {
-    switch (_appRoute) {
-      case AppRoute.videoPlayer:
-        return const VideoPlayerView();
-      case AppRoute.videoList:
-        return const VideoListView();
-    }
-  }
 }
