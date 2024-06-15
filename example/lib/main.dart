@@ -1,3 +1,7 @@
+// This example shows how to use the AvMediaView widget to play a video from a URL.
+// Which is a very basic way to use av_media_player package.
+// For more advanced usage, see main_advanced.dart.
+
 import 'package:flutter/material.dart';
 import 'package:av_media_player/widget.dart';
 

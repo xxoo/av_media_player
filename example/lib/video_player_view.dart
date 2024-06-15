@@ -1,3 +1,6 @@
+// This example shows how to handle playback events and control the player.
+// Please note that the SetStateAsync mixin is necessary cause setState() may be called during build process.
+
 import 'package:flutter/material.dart';
 import 'package:av_media_player/index.dart';
 import 'sources.dart';
@@ -32,7 +35,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
     _player.bufferRange.addListener(() {
       if (_player.bufferRange.value != BufferRange.empty) {
         debugPrint(
-            'pos: ${_player.position.value} buffer begin: ${_player.bufferRange.value.begin} buffer end: ${_player.bufferRange.value.end}');
+            'position: ${_player.position.value} buffer begin: ${_player.bufferRange.value.begin} buffer end: ${_player.bufferRange.value.end}');
       }
     });
   }

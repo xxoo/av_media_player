@@ -1,3 +1,6 @@
+// This example shows how to use a Texture widget to display video.
+// Please note that the SetStateAsync mixin is necessary cause setState() may be called during build process.
+
 import 'package:flutter/material.dart';
 import 'package:av_media_player/player.dart';
 import 'package:av_media_player/utils.dart';

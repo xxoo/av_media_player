@@ -6,30 +6,6 @@ import Flutter
 #endif
 
 class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
-#if os(macOS)
-	private var displayLink: CVDisplayLink?
-	func displayCallback(outputTime: CVTimeStamp) {
-		if output != nil && displayLink != nil {
-			let t = output!.itemTime(for: outputTime)
-			if reading != t && output!.hasNewPixelBuffer(forItemTime: t) {
-				textureRegistry.textureFrameAvailable(id)
-				reading = t
-			}
-		}
-	}
-#else
-	private var displayLink: CADisplayLink?
-	@objc private func displayCallback() {
-		if output != nil && displayLink != nil {
-			let t = output!.itemTime(forHostTime: displayLink!.targetTimestamp)
-			if reading != t && output!.hasNewPixelBuffer(forItemTime: t) {
-				textureRegistry.textureFrameAvailable(id)
-				reading = t
-			}
-		}
-	}
-#endif
-
 	var id: Int64!
 	private let textureRegistry: FlutterTextureRegistry
 	private let avPlayer = AVPlayer()
@@ -43,9 +19,33 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	private var volume: Float = 1
 	private var looping = false
 	private var reading: CMTime?
-	//0: idle, 1: opening, 2: ready, 3: playing
-	private var state: UInt8 = 0
+	private var rendering: CMTime?
+	private var state: UInt8 = 0 //0: idle, 1: opening, 2: ready, 3: playing
 	private var source: String?
+
+#if os(macOS)
+	private var displayLink: CVDisplayLink?
+	func displayCallback(outputTime: CVTimeStamp) {
+		if output != nil && displayLink != nil {
+			let t = output!.itemTime(for: outputTime)
+			if reading != t && rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
+				textureRegistry.textureFrameAvailable(id)
+				reading = t
+			}
+		}
+	}
+#else
+	private var displayLink: CADisplayLink?
+	@objc private func displayCallback() {
+		if output != nil && displayLink != nil {
+			let t = output!.itemTime(forHostTime: displayLink!.targetTimestamp)
+			if reading != t && rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
+				textureRegistry.textureFrameAvailable(id)
+				reading = t
+			}
+		}
+	}
+#endif
 
 	init(registrar: FlutterPluginRegistrar) {
 #if os(macOS)
@@ -116,6 +116,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		stopWatcher()
 		source = nil
 		reading = nil
+		rendering = nil
 		if avPlayer.currentItem != nil {
 			NotificationCenter.default.removeObserver(
 				self,
@@ -180,7 +181,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	func setLooping(loop: Bool) {
 		looping = loop
 	}
-	
+
 	private func stopVideo() {
 		if displayLink != nil {
 #if os(macOS)
@@ -191,14 +192,14 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			displayLink = nil
 		}
 	}
-	
+
 	private func stopWatcher() {
 		if watcher != nil {
 			avPlayer.removeTimeObserver(watcher!)
 			watcher = nil
 		}
 	}
-	
+
 	private func setPosition(time: CMTime) {
 		if time != position {
 			position = time
@@ -208,11 +209,12 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			])
 		}
 	}
-	
+
 	func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
 		if let t = reading {
 			reading = nil
 			if let buffer = output?.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: nil) {
+				rendering = t
 				return Unmanaged.passRetained(buffer)
 			}
 		}

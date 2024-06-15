@@ -1,3 +1,7 @@
+## 1.0.0
+
+- improve rendering performance on ios/macos.
+
 ## 0.7.2
 
 - prevent calling backend while player is disposed in dart side.

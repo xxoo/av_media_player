@@ -26,8 +26,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	private var watching = false
 	private var stillPreparing = false
 	private var bufferPosition = 0
-	//0: idle, 1: opening, 2: ready, 3: playing
-	private var state = 0u
+	private var state: UByte = 0u //0: idle, 1: opening, 2: ready, 3: playing
 	private var finished = false
 	private var hasVideo = false
 	private var source: String? = null
@@ -39,8 +38,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			state = 2u
 			mediaPlayer.setVolume(volume, volume)
 			if (mediaPlayer.duration > 0) {
-				//to ensure the first frame is loaded
-				mediaPlayer.seekTo(0)
+				mediaPlayer.seekTo(0) //to ensure the first frame is loaded
 				stillPreparing = true
 			} else if (source != null) {
 				eventSink?.success(mapOf(
@@ -69,7 +67,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			}
 		}
 		mediaPlayer.setOnCompletionListener {
-			if (state == 3u) {
+			if (state > 2u) {
 				if (mediaPlayer.duration <= 0) {
 					close()
 				} else if (looping) {
@@ -84,7 +82,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			}
 		}
 		mediaPlayer.setOnErrorListener { _, what, extra ->
-			if (state != 0u) {
+			if (state > 0u) {
 				close()
 				eventSink?.success(mapOf(
 					"event" to "error",
@@ -199,7 +197,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	}
 
 	fun pause() {
-		if (state == 3u) {
+		if (state > 2u) {
 			state = 2u
 			mediaPlayer.pause()
 		}
