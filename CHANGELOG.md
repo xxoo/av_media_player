@@ -1,3 +1,7 @@
+## 1.0.1
+
+- fixed an issue that may cause an error while disposing the player.
+
 ## 1.0.0
 
 - improve rendering performance on ios/macos.
@@ -6,7 +10,7 @@
 
 - prevent calling backend while player is disposed in dart side.
 
-## 0.7.1
+## 0.7.1 
 
 - optimize windows backend.
 

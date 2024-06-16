@@ -23,6 +23,7 @@ using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
 
 class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	static ID3D11Device* d3dDevice;
+	static DispatcherQueueController dispatcherController;
 	static DispatcherQueue dispatcherQueue;
 
 	EventChannel<EncodableValue>* eventChannel = nullptr;
@@ -53,7 +54,6 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 public:
 	static void initGlobal() {
 		//init_apartment(apartment_type::single_threaded);
-		DispatcherQueueController dispatcherController{ nullptr };
 		check_hresult(CreateDispatcherQueueController(
 			DispatcherQueueOptions{
 				sizeof(DispatcherQueueOptions),
@@ -84,7 +84,11 @@ public:
 			d3dDevice->Release();
 			d3dDevice = nullptr;
 		}
-		dispatcherQueue = nullptr;
+		if (dispatcherController != nullptr) {
+			dispatcherController.ShutdownQueueAsync();
+			dispatcherController = nullptr;
+			dispatcherQueue = nullptr;
+		}
 		//uninit_apartment();
 	}
 
@@ -419,7 +423,8 @@ public:
 	}
 };
 ID3D11Device* AvMediaPlayer::d3dDevice = nullptr;
-DispatcherQueue AvMediaPlayer::dispatcherQueue{ nullptr };
+DispatcherQueueController AvMediaPlayer::dispatcherController = nullptr;
+DispatcherQueue AvMediaPlayer::dispatcherQueue = nullptr;
 
 class AvMediaPlayerPlugin : public Plugin {
 	MethodChannel<EncodableValue>* methodChannel;

@@ -249,10 +249,10 @@ class AvMediaPlayer {
   void dispose() {
     if (!disposed) {
       disposed = true;
+      _eventSubscription?.cancel();
       if (id.value != null) {
         _methodChannel.invokeMethod('dispose', id.value);
       }
-      _eventSubscription?.cancel();
       id.dispose();
       mediaInfo.dispose();
       videoSize.dispose();
