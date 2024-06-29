@@ -22,6 +22,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	private var rendering: CMTime?
 	private var state: UInt8 = 0 //0: idle, 1: opening, 2: ready, 3: playing
 	private var source: String?
+	private var startTime: CMTime?
 
 #if os(macOS)
 	private var displayLink: CVDisplayLink?
@@ -97,7 +98,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			NotificationCenter.default.addObserver(
 				self,
 				selector: #selector(onFinish(notification:)),
-				name: .AVPlayerItemDidPlayToEndTime,
+				name: AVPlayerItem.didPlayToEndTimeNotification,
 				object: avPlayer.currentItem
 			)
 		}
@@ -120,7 +121,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		if avPlayer.currentItem != nil {
 			NotificationCenter.default.removeObserver(
 				self,
-				name: .AVPlayerItemDidPlayToEndTime,
+				name: AVPlayerItem.didPlayToEndTimeNotification,
 				object: avPlayer.currentItem
 			)
 			avPlayer.replaceCurrentItem(with: nil)
@@ -128,19 +129,10 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	}
 
 	func play() {
-		if state > 1 {
+		if state == 2 {
 			state = 3
-			if watcher == nil && avPlayer.currentItem != nil && avPlayer.currentItem!.duration.seconds > 0 {
-				watcher = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.01, preferredTimescale: 1000), queue: nil) { [weak self] time in
-					if self != nil {
-						if self!.avPlayer.rate == 0 || self!.avPlayer.error != nil {
-							self!.stopWatcher()
-						}
-						self!.setPosition(time: time)
-					}
-				}
-			}
-			avPlayer.rate = speed
+			startTime = avPlayer.currentTime()
+			justPlay()
 		}
 	}
 
@@ -180,6 +172,20 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
 	func setLooping(loop: Bool) {
 		looping = loop
+	}
+
+	private func justPlay() {
+		if watcher == nil && avPlayer.currentItem != nil && avPlayer.currentItem!.duration.seconds > 0 {
+			watcher = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.01, preferredTimescale: 1000), queue: nil) { [weak self] time in
+				if self != nil {
+					if self!.avPlayer.rate == 0 || self!.avPlayer.error != nil {
+						self!.stopWatcher()
+					}
+					self!.setPosition(time: time)
+				}
+			}
+		}
+		avPlayer.rate = speed
 	}
 
 	private func stopVideo() {
@@ -227,23 +233,17 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 				if avPlayer.currentItem != nil {
 					close()
 				}
-				eventSink?(["event": "finished"])
-			} else {
+			} else if looping || startTime == avPlayer.currentTime() {
+				startTime = nil
 				avPlayer.seek(to: .zero) { [weak self] finished in
-				 if self != nil {
-					 if self!.looping {
-						 self!.play()
-					 } else {
-						 self!.state = 2
-						 if finished {
-							 self!.position = .zero
-							 self!.bufferPosition = .zero
-						 }
-					 }
-					 self!.eventSink?(["event": "finished"])
-				 }
-			 }
+					if self != nil && finished {
+						self!.justPlay()
+					}
+				}
+			} else {
+				state = 2
 			}
+			eventSink?(["event": "finished"])
 		}
 	}
 
@@ -262,7 +262,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		case #keyPath(AVPlayer.timeControlStatus):
 			if let oldValue = change?[NSKeyValueChangeKey.oldKey] as? Int,
 				let oldStatus = AVPlayer.TimeControlStatus(rawValue: oldValue),
-				oldStatus == .waitingToPlayAtSpecifiedRate || avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate {
+				state > 2 && (oldStatus == .waitingToPlayAtSpecifiedRate || avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate) {
 				eventSink?([
 					"event": "loading",
 					"value": avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate
@@ -271,13 +271,15 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		case #keyPath(AVPlayer.currentItem.status):
 			switch avPlayer.currentItem?.status {
 			case .readyToPlay:
-				avPlayer.volume = volume
-				state = 2
-				eventSink?([
-					"event": "mediaInfo",
-					"duration": avPlayer.currentItem!.duration.seconds > 0 ? Int(avPlayer.currentItem!.duration.seconds * 1000) : 0,
-					"source": source!
-				])
+				if state == 1 {
+					avPlayer.volume = volume
+					state = 2
+					eventSink?([
+						"event": "mediaInfo",
+						"duration": avPlayer.currentItem!.duration.seconds > 0 ? Int(avPlayer.currentItem!.duration.seconds * 1000) : 0,
+						"source": source!
+					])
+				}
 			case .failed:
 				if state > 0 {
 					eventSink?([

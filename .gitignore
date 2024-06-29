@@ -27,4 +27,5 @@ pubspec.lock
 podfile.lock
 **/doc/api/
 .dart_tool/
+.vscode/
 build/

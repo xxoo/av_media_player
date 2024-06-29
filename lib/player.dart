@@ -193,8 +193,6 @@ class AvMediaPlayer {
           } else if (e['event'] == 'finished') {
             if (mediaInfo.value != null) {
               if (!looping.value && mediaInfo.value!.duration != 0) {
-                position.value = 0;
-                bufferRange.value = BufferRange.empty;
                 playbackState.value = PlaybackState.paused;
               }
               finishedTimes.value += 1;

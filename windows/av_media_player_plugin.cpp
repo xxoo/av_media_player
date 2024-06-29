@@ -6,12 +6,12 @@
 #include <flutter/standard_method_codec.h>
 #include <d3d11.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
-#include <dispatcherqueue.h>
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.core.h>
 #include <winrt/Windows.Media.Playback.h>
+#include <DispatcherQueue.h>
 
 using namespace std;
 using namespace flutter;
@@ -45,7 +45,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	void postMessage(const EncodableMap& message) {
 		dispatcherQueue.TryEnqueue(DispatcherQueueHandler([weakThis = weak_from_this(), message]() {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->eventSink.get() != nullptr) {
+			if (sharedThis && sharedThis->eventSink.get()) {
 				sharedThis->eventSink->Success(message);
 			}
 		}));
@@ -80,11 +80,11 @@ public:
 	}
 
 	static void uninitGlobal() {
-		if (d3dDevice != nullptr) {
+		if (d3dDevice) {
 			d3dDevice->Release();
 			d3dDevice = nullptr;
 		}
-		if (dispatcherController != nullptr) {
+		if (dispatcherController) {
 			dispatcherController.ShutdownQueueAsync();
 			dispatcherController = nullptr;
 			dispatcherQueue = nullptr;
@@ -103,14 +103,14 @@ public:
 
 	~AvMediaPlayer() {
 		mediaPlayer.Close();
-		if (textureRegistrar != nullptr) {
+		if (textureRegistrar) {
 			textureRegistrar->UnregisterTexture(textureId);
 			delete texture;
 		}
-		if (eventSink != nullptr) {
+		if (eventSink) {
 			eventSink->EndOfStream();
 		}
-		if (eventChannel != nullptr) {
+		if (eventChannel) {
 			eventChannel->SetStreamHandler(nullptr);
 			delete eventChannel;
 		}
@@ -124,7 +124,7 @@ public:
 			//kFlutterDesktopGpuSurfaceTypeD3d11Texture2D,
 			[weakThis](auto, auto) -> const FlutterDesktopGpuSurfaceDescriptor* {
 				auto sharedThis = weakThis.lock();
-				if (sharedThis != nullptr && sharedThis->direct3DSurface != nullptr) {
+				if (sharedThis && sharedThis->direct3DSurface) {
 					sharedThis->mediaPlayer.CopyFrameToVideoSurface(sharedThis->direct3DSurface);
 					return &sharedThis->textureBuffer;
 				} else {
@@ -143,14 +143,14 @@ public:
 		eventChannel->SetStreamHandler(make_unique<StreamHandlerFunctions<EncodableValue>>(
 			[weakThis](const EncodableValue* arguments, unique_ptr<EventSink<EncodableValue>>&& events) {
 				auto sharedThis = weakThis.lock();
-				if (sharedThis != nullptr) {
+				if (sharedThis) {
 					sharedThis->eventSink = move(events);
 				}
 				return nullptr;
 			},
 			[weakThis](const EncodableValue* arguments) {
 				auto sharedThis = weakThis.lock();
-				if (sharedThis != nullptr) {
+				if (sharedThis) {
 					sharedThis->eventSink = nullptr;
 				}
 				return nullptr;
@@ -160,7 +160,7 @@ public:
 
 		playbackSession.NaturalVideoSizeChanged([weakThis](MediaPlaybackSession playbackSession, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state > 0) {
+			if (sharedThis && sharedThis->state > 0) {
 				sharedThis->textureBuffer.visible_width = playbackSession.NaturalVideoWidth();
 				sharedThis->textureBuffer.visible_height = playbackSession.NaturalVideoHeight();
 				if (sharedThis->textureBuffer.width != sharedThis->textureBuffer.visible_width || sharedThis->textureBuffer.height != sharedThis->textureBuffer.visible_height) {
@@ -203,7 +203,7 @@ public:
 
 		playbackSession.PositionChanged([weakThis](MediaPlaybackSession playbackSession, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && !sharedThis->mediaPlayer.RealTimePlayback()) {
+			if (sharedThis && sharedThis->state > 1 && !sharedThis->mediaPlayer.RealTimePlayback()) {
 				auto position = playbackSession.Position().count() / 10000;
 				if (position != sharedThis->position) {
 					sharedThis->position = position;
@@ -217,7 +217,7 @@ public:
 
 		playbackSession.SeekCompleted([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state > 1) {
+			if (sharedThis && sharedThis->state > 1) {
 				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("seekEnd") }
 				});
@@ -226,7 +226,7 @@ public:
 
 		playbackSession.BufferingStarted([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state > 1) {
+			if (sharedThis && sharedThis->state > 2) {
 				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("loading") },
 					{ EncodableValue("value"), EncodableValue(true) }
@@ -236,7 +236,7 @@ public:
 
 		playbackSession.BufferingEnded([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state > 1) {
+			if (sharedThis && sharedThis->state > 2) {
 				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("loading") },
 					{ EncodableValue("value"), EncodableValue(false) }
@@ -246,7 +246,7 @@ public:
 
 		playbackSession.BufferedRangesChanged([weakThis](MediaPlaybackSession playbackSession, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state > 1 && !sharedThis->mediaPlayer.RealTimePlayback()) {
+			if (sharedThis && sharedThis->state > 1 && !sharedThis->mediaPlayer.RealTimePlayback()) {
 				auto buffered = playbackSession.GetBufferedRanges();
 				for (uint32_t i = 0; i < buffered.Size(); i++) {
 					auto start = buffered.GetAt(i).Start.count();
@@ -270,14 +270,14 @@ public:
 
 		mediaPlayer.VideoFrameAvailable([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->direct3DSurface != nullptr) {
+			if (sharedThis && sharedThis->direct3DSurface) {
 				sharedThis->textureRegistrar->MarkTextureFrameAvailable(sharedThis->textureId);
 			}
 		});
 
 		mediaPlayer.MediaFailed([weakThis](auto, MediaPlayerFailedEventArgs const& reason) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state > 0) {
+			if (sharedThis && sharedThis->state > 0) {
 				sharedThis->close();
 				EncodableValue message;
 				switch (reason.Error()) {
@@ -306,7 +306,7 @@ public:
 
 		mediaPlayer.MediaOpened([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state == 1) {
+			if (sharedThis && sharedThis->state == 1) {
 				auto playbackSession = sharedThis->mediaPlayer.PlaybackSession();
 				sharedThis->state = 2;
 				sharedThis->mediaPlayer.Volume(sharedThis->volume);
@@ -326,15 +326,13 @@ public:
 
 		mediaPlayer.MediaEnded([weakThis](auto, auto) {
 			auto sharedThis = weakThis.lock();
-			if (sharedThis != nullptr && sharedThis->state == 3) {
+			if (sharedThis && sharedThis->state > 2) {
 				if (sharedThis->mediaPlayer.RealTimePlayback()) {
 					sharedThis->close();
 				} else if (sharedThis->looping) {
 					sharedThis->mediaPlayer.Play();
 				} else {
 					sharedThis->state = 2;
-					sharedThis->position = 0;
-					sharedThis->bufferPosition = 0;
 				}
 				sharedThis->postMessage(EncodableMap{
 					{ EncodableValue("event"), EncodableValue("finished") }
@@ -377,21 +375,21 @@ public:
 		bufferPosition = 0;
 		source = "";
 		auto src = mediaPlayer.Source();
-		if (src != nullptr) {
+		if (src) {
 			mediaPlayer.Source(nullptr);
 			src.as<MediaSource>().Close();
 		}
 	}
 
 	void play() {
-		if (state > 1) {
+		if (state == 2) {
 			state = 3;
 			mediaPlayer.Play();
 		}
 	}
 
 	void pause() {
-		if (state == 3) {
+		if (state > 2) {
 			state = 2;
 			mediaPlayer.Pause();
 		}
@@ -399,7 +397,7 @@ public:
 
 	void seekTo(int64_t pos) {
 		auto playbackSession = mediaPlayer.PlaybackSession();
-		if (eventSink != nullptr && (mediaPlayer.Source() == nullptr || mediaPlayer.RealTimePlayback() || playbackSession.Position().count() / 10000 == pos)) {
+		if (eventSink && (!mediaPlayer.Source() || mediaPlayer.RealTimePlayback() || playbackSession.Position().count() / 10000 == pos)) {
 			eventSink->Success(EncodableValue(EncodableMap{
 				{EncodableValue("event"), EncodableValue("seekEnd")}
 			}));

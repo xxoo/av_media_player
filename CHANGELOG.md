@@ -1,3 +1,8 @@
+## 1.0.2
+
+- add linux support.
+- no longer automatically seek to beginning while playback reaches the end if looping is off.
+
 ## 1.0.1
 
 - fixed an issue that may cause an error while disposing the player.
@@ -10,7 +15,7 @@
 
 - prevent calling backend while player is disposed in dart side.
 
-## 0.7.1 
+## 0.7.1
 
 - optimize windows backend.
 

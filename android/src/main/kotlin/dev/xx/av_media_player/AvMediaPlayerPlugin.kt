@@ -35,17 +35,19 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	init {
 		eventChannel.setStreamHandler(this)
 		mediaPlayer.setOnPreparedListener {
-			state = 2u
-			mediaPlayer.setVolume(volume, volume)
-			if (mediaPlayer.duration > 0) {
-				mediaPlayer.seekTo(0) //to ensure the first frame is loaded
-				stillPreparing = true
-			} else if (source != null) {
-				eventSink?.success(mapOf(
-					"event" to "mediaInfo",
-					"duration" to max(mediaPlayer.duration, 0),
-					"source" to source
-				))
+			if (state.equals(1u)) {
+				state = 2u
+				mediaPlayer.setVolume(volume, volume)
+				if (mediaPlayer.duration > 0) {
+					mediaPlayer.seekTo(0) //to ensure the first frame is loaded
+					stillPreparing = true
+				} else if (source != null) {
+					eventSink?.success(mapOf(
+						"event" to "mediaInfo",
+						"duration" to max(mediaPlayer.duration, 0),
+						"source" to source
+					))
+				}
 			}
 		}
 		mediaPlayer.setOnVideoSizeChangedListener { _, _, _ ->
@@ -71,11 +73,9 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 				if (mediaPlayer.duration <= 0) {
 					close()
 				} else if (looping) {
-					play()
+					justPlay()
 				} else {
 					state = 2u
-					position = 0
-					bufferPosition = 0
 					finished = true
 				}
 				eventSink?.success(mapOf("event" to "finished"))
@@ -92,16 +92,18 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			true
 		}
 		mediaPlayer.setOnInfoListener { _, what, _ ->
-			if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
-				eventSink?.success(mapOf(
-					"event" to "loading",
-					"value" to true
-				))
-			} else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
-				eventSink?.success(mapOf(
-					"event" to "loading",
-					"value" to false
-				))
+			if (state > 2u) {
+				if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
+					eventSink?.success(mapOf(
+						"event" to "loading",
+						"value" to true
+					))
+				} else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
+					eventSink?.success(mapOf(
+						"event" to "loading",
+						"value" to false
+					))
+				}
 			}
 			true
 		}
@@ -186,13 +188,10 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	}
 
 	fun play() {
-		if (state > 1u) {
+		if (state.equals(2u)) {
 			finished = false
 			state = 3u
-			mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
-			if (!watching && mediaPlayer.duration > 0) {
-				startWatcher()
-			}
+			justPlay()
 		}
 	}
 
@@ -226,6 +225,13 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 
 	fun setLooping(loop: Boolean) {
 		looping = loop
+	}
+
+	private fun justPlay() {
+		mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
+		if (!watching && mediaPlayer.duration > 0) {
+			startWatcher()
+		}
 	}
 
 	private fun startWatcher() {
