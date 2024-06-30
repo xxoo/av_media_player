@@ -22,7 +22,6 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	private var rendering: CMTime?
 	private var state: UInt8 = 0 //0: idle, 1: opening, 2: ready, 3: playing
 	private var source: String?
-	private var startTime: CMTime?
 
 #if os(macOS)
 	private var displayLink: CVDisplayLink?
@@ -131,13 +130,12 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	func play() {
 		if state == 2 {
 			state = 3
-			startTime = avPlayer.currentTime()
 			justPlay()
 		}
 	}
 
 	func pause() {
-		if state == 3 {
+		if state > 2 {
 			state = 2
 			avPlayer.pause()
 		}
@@ -175,17 +173,26 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	}
 
 	private func justPlay() {
-		if watcher == nil && avPlayer.currentItem != nil && avPlayer.currentItem!.duration.seconds > 0 {
-			watcher = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.01, preferredTimescale: 1000), queue: nil) { [weak self] time in
-				if self != nil {
-					if self!.avPlayer.rate == 0 || self!.avPlayer.error != nil {
-						self!.stopWatcher()
-					}
-					self!.setPosition(time: time)
+		if position == avPlayer.currentItem!.duration {
+			avPlayer.seek(to: .zero) { [weak self] finished in
+				if finished && self != nil {
+					self!.setPosition(time: .zero)
+					self!.justPlay()
 				}
 			}
+		} else {
+			if watcher == nil && avPlayer.currentItem != nil && avPlayer.currentItem!.duration.seconds > 0 {
+				watcher = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.01, preferredTimescale: 1000), queue: nil) { [weak self] time in
+					if self != nil {
+						if self!.avPlayer.rate == 0 || self!.avPlayer.error != nil {
+							self!.stopWatcher()
+						}
+						self!.setPosition(time: time)
+					}
+				}
+			}
+			avPlayer.rate = speed
 		}
-		avPlayer.rate = speed
 	}
 
 	private func stopVideo() {
@@ -228,20 +235,21 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	}
 
 	@objc private func onFinish(notification: NSNotification) {
-		if state == 3 {
+		if state > 2 {
 			if avPlayer.currentItem == nil || avPlayer.currentItem!.duration == .zero {
 				if avPlayer.currentItem != nil {
 					close()
 				}
-			} else if looping || startTime == avPlayer.currentTime() {
-				startTime = nil
-				avPlayer.seek(to: .zero) { [weak self] finished in
-					if self != nil && finished {
-						self!.justPlay()
-					}
-				}
 			} else {
-				state = 2
+				if watcher != nil {
+					stopWatcher()
+				}
+				setPosition(time: avPlayer.currentItem!.duration)
+				if looping {
+					justPlay()
+				} else {
+					state = 2
+				}
 			}
 			eventSink?(["event": "finished"])
 		}

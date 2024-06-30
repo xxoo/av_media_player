@@ -1,7 +1,7 @@
 ## 1.0.2
 
 - add linux support.
-- no longer automatically seek to beginning while playback reaches the end if looping is off.
+- **behavior change:** do not seek to beginning while playback is reaching the end until new playback started.
 
 ## 1.0.1
 

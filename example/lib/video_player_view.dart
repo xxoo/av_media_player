@@ -179,7 +179,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                           onChanged: (value) => _player.setSpeed(value),
                           min: 0.5,
                           max: 2,
-                          divisions: (2 - 0.25) ~/ 0.25,
+                          divisions: 3,
                         ),
                       ),
                     ],
