@@ -1,3 +1,7 @@
+## 1.0.3
+
+- fixed a serious bug on android that introduced in v1.0.2.
+
 ## 1.0.2
 
 - add linux support.
