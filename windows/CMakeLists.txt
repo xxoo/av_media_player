@@ -19,7 +19,6 @@ set(PLUGIN_NAME "av_media_player_plugin")
 # Define the plugin library target. Its name must not be changed (see comment
 # on PLUGIN_NAME above).
 add_library(${PLUGIN_NAME} SHARED
-  "include/av_media_player/av_media_player_plugin_c_api.h"
   "av_media_player_plugin.cpp"
 )
 

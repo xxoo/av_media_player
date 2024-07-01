@@ -25,7 +25,6 @@ if (flutterVersionName == null) {
 android {
     namespace "dev.xx.av_media_player_example"
     compileSdk flutter.compileSdkVersion
-    ndkVersion flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8

@@ -35,7 +35,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	init {
 		eventChannel.setStreamHandler(this)
 		mediaPlayer.setOnPreparedListener {
-			if (state.equals(1u)) {
+			if (state.compareTo(1u) == 0) {
 				state = 2u
 				mediaPlayer.setVolume(volume, volume)
 				if (mediaPlayer.duration > 0) {
@@ -188,7 +188,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	}
 
 	fun play() {
-		if (state.equals(2u)) {
+		if (state.compareTo(2u) == 0) {
 			finished = false
 			state = 3u
 			justPlay()
