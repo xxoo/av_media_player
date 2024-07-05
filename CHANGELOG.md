@@ -1,3 +1,7 @@
+## 1.0.5
+
+- fixed a critical issue on ios/macos that may antifact the video.
+
 ## 1.0.4
 
 - move android backend to `ExoPlayer` for wider compatibility.

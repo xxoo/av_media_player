@@ -28,7 +28,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 #else
 	private var displayLink: CADisplayLink?
 	@objc private func displayCallback() {
-		if output != nil && displayLink != nil {
+		if displayLink != nil {
 			let t = output!.itemTime(forHostTime: displayLink!.targetTimestamp)
 			if reading != t && rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
 				textureRegistry.textureFrameAvailable(id)
@@ -99,10 +99,6 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		position = .zero
 		bufferPosition = .zero
 		avPlayer.pause()
-		if output != nil {
-			avPlayer.currentItem?.remove(output!)
-			output = nil
-		}
 		stopVideo()
 		stopWatcher()
 		source = nil
@@ -185,6 +181,14 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			avPlayer.rate = speed
 		}
 	}
+	
+	private func createOutput() {
+		output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
+			String(kCVPixelBufferIOSurfacePropertiesKey): [:],
+			String(kCVPixelBufferPixelFormatTypeKey): kCVPixelFormatType_32BGRA
+		])
+		avPlayer.currentItem!.add(output!)
+	}
 
 	private func stopVideo() {
 		if displayLink != nil {
@@ -194,6 +198,10 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			displayLink!.invalidate()
 #endif
 			displayLink = nil
+		}
+		if output != nil {
+			avPlayer.currentItem?.remove(output!)
+			output = nil
 		}
 	}
 
@@ -296,31 +304,29 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 				state > 0 {
 				if width == 0 || height == 0 {
 					stopVideo()
-				} else {
-					if displayLink == nil {
-						output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
-						avPlayer.currentItem!.add(output!)
+				} else if displayLink == nil {
 #if os(macOS)
-						CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-						if displayLink != nil {
-							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
-								let player: AvMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
-								if player.output != nil && player.displayLink != nil {
-									let t = player.output!.itemTime(for: outputTime.pointee)
-									if player.reading != t && player.rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
-										player.textureRegistry.textureFrameAvailable(player.id)
-										player.reading = t
-									}
+					CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
+					if displayLink != nil {
+						CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
+							let player: AvMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
+							if player.displayLink != nil {
+								let t = player.output!.itemTime(for: outputTime.pointee)
+								if player.reading != t && player.rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
+									player.textureRegistry.textureFrameAvailable(player.id)
+									player.reading = t
 								}
-								return kCVReturnSuccess
-							}, Unmanaged.passUnretained(self).toOpaque())
-							CVDisplayLinkStart(displayLink!)
-						}
-#else
-						displayLink = CADisplayLink(target: self, selector: #selector(displayCallback))
-						displayLink!.add(to: .current, forMode: .common)
-#endif
+							}
+							return kCVReturnSuccess
+						}, Unmanaged.passUnretained(self).toOpaque())
+						CVDisplayLinkStart(displayLink!)
+						createOutput()
 					}
+#else
+					displayLink = CADisplayLink(target: self, selector: #selector(displayCallback))
+					displayLink!.add(to: .current, forMode: .common)
+					createOutput()
+#endif
 				}
 				eventSink?([
 					"event": "videoSize",
