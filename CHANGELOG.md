@@ -1,3 +1,8 @@
+## 1.0.4
+
+- move android backend to `ExoPlayer` for wider compatibility.
+- improve windows backend stability.
+
 ## 1.0.3
 
 - fixed a serious bug on android that introduced in v1.0.2.

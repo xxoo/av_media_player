@@ -90,7 +90,7 @@ class AvMediaPlayer {
   StreamSubscription? _eventSubscription;
   String? _source;
   int? _position;
-  var _seeked = false;
+  var _seeking = false;
 
   /// All the parameters are optional, and can be changed later by calling the corresponding methods.
   AvMediaPlayer({
@@ -187,7 +187,7 @@ class AvMediaPlayer {
             }
           } else if (e['event'] == 'seekEnd') {
             if (mediaInfo.value != null) {
-              _seeked = false;
+              _seeking = false;
               loading.value = false;
             }
           } else if (e['event'] == 'finished') {
@@ -334,7 +334,7 @@ class AvMediaPlayer {
       if (id.value != null && playbackState.value == PlaybackState.playing) {
         _methodChannel.invokeMethod('pause', id.value);
         playbackState.value = PlaybackState.paused;
-        if (!_seeked) {
+        if (!_seeking) {
           loading.value = false;
         }
         return true;
@@ -353,7 +353,12 @@ class AvMediaPlayer {
   /// position: The position to seek to in milliseconds.
   bool seekTo(int position) {
     if (!disposed && id.value != null) {
-      if (mediaInfo.value != null) {
+      if (mediaInfo.value == null) {
+        if (loading.value) {
+          _position = position;
+          return true;
+        }
+      } else if (mediaInfo.value!.duration > 0) {
         if (position < 0) {
           position = 0;
         } else if (position > mediaInfo.value!.duration) {
@@ -364,10 +369,7 @@ class AvMediaPlayer {
           'value': position,
         });
         loading.value = true;
-        _seeked = true;
-        return true;
-      } else if (loading.value) {
-        _position = position;
+        _seeking = true;
         return true;
       }
     }

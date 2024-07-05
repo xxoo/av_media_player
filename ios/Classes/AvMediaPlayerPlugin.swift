@@ -25,15 +25,6 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 
 #if os(macOS)
 	private var displayLink: CVDisplayLink?
-	func displayCallback(outputTime: CVTimeStamp) {
-		if output != nil && displayLink != nil {
-			let t = output!.itemTime(for: outputTime)
-			if reading != t && rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
-				textureRegistry.textureFrameAvailable(id)
-				reading = t
-			}
-		}
-	}
 #else
 	private var displayLink: CADisplayLink?
 	@objc private func displayCallback() {
@@ -314,7 +305,13 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 						if displayLink != nil {
 							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
 								let player: AvMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
-								player.displayCallback(outputTime: outputTime.pointee)
+								if player.output != nil && player.displayLink != nil {
+									let t = player.output!.itemTime(for: outputTime.pointee)
+									if player.reading != t && player.rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
+										player.textureRegistry.textureFrameAvailable(player.id)
+										player.reading = t
+									}
+								}
 								return kCVReturnSuccess
 							}, Unmanaged.passUnretained(self).toOpaque())
 							CVDisplayLinkStart(displayLink!)
@@ -386,13 +383,13 @@ public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
 	}
 
 	public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+		var response: Any?
 		switch call.method {
 		case "create":
 			let player = AvMediaPlayer(registrar: registrar)
 			players[player.id] = player
-			result(player.id)
+			response = player.id
 		case "dispose":
-			result(nil)
 			if let id = call.arguments as? Int64 {
 				players[id]?.close()
 				players.removeValue(forKey: id)
@@ -400,57 +397,29 @@ public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
 				detachFromEngine(for: registrar)
 			}
 		case "open":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? String {
-				players[id]?.open(source: value)
-			}
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.open(source: args["value"] as! String)
 		case "close":
-			result(nil)
-			if let id = call.arguments as? Int64 {
-				players[id]?.close()
-			}
+			players[call.arguments as! Int64]?.close()
 		case "play":
-			result(nil)
-			if let id = call.arguments as? Int64 {
-				players[id]?.play()
-			}
+			players[call.arguments as! Int64]?.play()
 		case "pause":
-			result(nil)
-			if let id = call.arguments as? Int64 {
-				players[id]?.pause()
-			}
+			players[call.arguments as! Int64]?.pause()
 		case "seekTo":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Double {
-				players[id]?.seekTo(pos: CMTime(seconds: value / 1000, preferredTimescale: 1000))
-			}
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.seekTo(pos: CMTime(seconds: args["value"] as! Double / 1000, preferredTimescale: 1000))
 		case "setVolume":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Float {
-				players[id]?.setVolume(vol: value)
-			}
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setVolume(vol: args["value"] as! Float)
 		case "setSpeed":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Float {
-				players[id]?.setSpeed(spd: value)
-			}
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setSpeed(spd: args["value"] as! Float)
 		case "setLooping":
-			result(nil)
-			if let args = call.arguments as? [String: Any],
-				let id = args["id"] as? Int64,
-				let value = args["value"] as? Bool {
-				players[id]?.setLooping(loop: value)
-			}
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setLooping(loop: args["value"] as! Bool)
 		default:
-			result(FlutterMethodNotImplemented)
+			response = FlutterMethodNotImplemented
 		}
+		result(response)
 	}
 }

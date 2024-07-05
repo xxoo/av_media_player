@@ -328,6 +328,7 @@ static void av_media_player_dispose(GObject* obj) {
 	G_OBJECT_CLASS(av_media_player_parent_class)->dispose(obj);
 	AvMediaPlayer* self = AV_MEDIA_PLAYER(obj);
 	g_idle_remove_by_data(self);
+	fl_event_channel_send_end_of_stream(self->eventChannel, NULL, NULL);
 	mpv_render_context_free(self->mpvRenderContext);
 	mpv_destroy(self->mpv);
 	g_free(self->source);

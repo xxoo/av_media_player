@@ -23,7 +23,7 @@ class _MyAppState extends State<MyApp> {
         children: [
           AvMediaView(
             initSource:
-                'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8',
+                'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8',
             initLooping: true,
             initAutoPlay: true,
             onCreated: (player) => player.loading.addListener(

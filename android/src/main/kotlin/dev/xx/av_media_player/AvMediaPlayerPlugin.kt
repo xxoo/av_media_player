@@ -1,149 +1,47 @@
 package dev.xx.av_media_player
 
+import kotlin.math.round
+import android.os.Handler
+import android.view.Surface
+import androidx.media3.common.VideoSize
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
-import android.content.res.AssetFileDescriptor
-import android.media.MediaPlayer
-import android.view.Surface
-import android.os.Handler
-import android.os.Looper
-import kotlin.math.max
 
-class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler {
+class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler, Player.Listener {
 	private val surfaceTextureEntry = binding.textureRegistry.createSurfaceTexture()
-	val id = surfaceTextureEntry.id()
-	private val eventChannel = EventChannel(binding.binaryMessenger, "av_media_player/$id")
+	val id = surfaceTextureEntry.id().toInt()
 	private val surface = Surface(surfaceTextureEntry.surfaceTexture())
-	private val mediaPlayer = MediaPlayer()
-	private val handler = Handler(Looper.myLooper() ?: Looper.getMainLooper())
+	private val exoPlayer = ExoPlayer.Builder(binding.applicationContext).build()
+	private val handler = Handler(exoPlayer.applicationLooper)
+	private val eventChannel = EventChannel(binding.binaryMessenger, "av_media_player/$id")
 
-	private var speed = 1f
-	private var volume = 1f
+	private var speed = 1F
+	private var volume = 1F
 	private var looping = false
-	private var position = 0
+	private var position = 0L
 	private var eventSink: EventChannel.EventSink? = null
 	private var watching = false
+	private var buffering = false
 	private var stillPreparing = false
-	private var bufferPosition = 0
-	private var state: UByte = 0u //0: idle, 1: opening, 2: ready, 3: playing
-	private var finished = false
-	private var hasVideo = false
+	private var bufferPosition = 0L
+	private var state: UByte = 0U //0: idle, 1: opening, 2: ready, 3: playing
 	private var source: String? = null
-	private var fd: AssetFileDescriptor? = null
+	private var seeking = false
+	private var networking = false
 
 	init {
+		binding.textureRegistry.createSurfaceProducer()
 		eventChannel.setStreamHandler(this)
-		mediaPlayer.setOnPreparedListener {
-			if (state.compareTo(1u) == 0) {
-				state = 2u
-				mediaPlayer.setVolume(volume, volume)
-				if (mediaPlayer.duration > 0) {
-					mediaPlayer.seekTo(0) //to ensure the first frame is loaded
-					stillPreparing = true
-				} else if (source != null) {
-					eventSink?.success(mapOf(
-						"event" to "mediaInfo",
-						"duration" to max(mediaPlayer.duration, 0),
-						"source" to source
-					))
-				}
-			}
-		}
-		mediaPlayer.setOnVideoSizeChangedListener { _, _, _ ->
-			if (state > 0u) {
-				if (mediaPlayer.videoWidth > 0 && mediaPlayer.videoHeight > 0) {
-					if (!hasVideo) {
-						hasVideo = true
-						mediaPlayer.setSurface(surface)
-					}
-				} else if (hasVideo) {
-					hasVideo = false
-					mediaPlayer.setSurface(null)
-				}
-				eventSink?.success(mapOf(
-					"event" to "videoSize",
-					"width" to mediaPlayer.videoWidth.toDouble(),
-					"height" to mediaPlayer.videoHeight.toDouble()
-				))
-			}
-		}
-		mediaPlayer.setOnCompletionListener {
-			if (state > 2u) {
-				if (mediaPlayer.duration <= 0) {
-					close()
-				} else if (looping) {
-					justPlay()
-				} else {
-					state = 2u
-					finished = true
-				}
-				eventSink?.success(mapOf("event" to "finished"))
-			}
-		}
-		mediaPlayer.setOnErrorListener { _, what, extra ->
-			if (state > 0u) {
-				close()
-				eventSink?.success(mapOf(
-					"event" to "error",
-					"value" to "$what,$extra"
-				))
-			}
-			true
-		}
-		mediaPlayer.setOnInfoListener { _, what, _ ->
-			if (state > 2u) {
-				if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
-					eventSink?.success(mapOf(
-						"event" to "loading",
-						"value" to true
-					))
-				} else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
-					eventSink?.success(mapOf(
-						"event" to "loading",
-						"value" to false
-					))
-				}
-			}
-			true
-		}
-		mediaPlayer.setOnSeekCompleteListener {
-			//the video is real prepared now
-			if (stillPreparing) {
-				stillPreparing = false
-				if (source != null) {
-					eventSink?.success(mapOf(
-						"event" to "mediaInfo",
-						"duration" to mediaPlayer.duration,
-						"source" to source
-					))
-				}
-			} else {
-				if (!watching) {
-					watchPosition()
-				}
-				eventSink?.success(mapOf("event" to "seekEnd"))
-			}
-		}
-		mediaPlayer.setOnBufferingUpdateListener { _, percent ->
-			if (state > 1u) {
-				val bufferPos: Int = mediaPlayer.duration * percent / 100
-				val pos = mediaPlayer.currentPosition
-				val realBufferPosition = max(bufferPos,  pos)
-				if (realBufferPosition != bufferPosition) {
-					bufferPosition = realBufferPosition
-					eventSink?.success(mapOf(
-						"event" to "buffer",
-						"begin" to pos,
-						"end" to bufferPosition
-					))
-				}
-			}
-		}
+		exoPlayer.addListener(this)
 	}
 
 	fun dispose() {
-		mediaPlayer.release()
+		exoPlayer.release()
 		surface.release()
 		surfaceTextureEntry.release()
 		handler.removeCallbacksAndMessages(null)
@@ -152,19 +50,21 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 
 	fun open(source: String) {
 		close()
-		this.source = source
-		state = 1u
-		if (hasVideo) {
-			mediaPlayer.setSurface(null)
+		var url = ""
+		if (source.startsWith("asset://")) {
+			url = "asset:///${binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8))}"
+		} else if (source.startsWith("file://") || !source.contains("://")) {
+			url = if (source.startsWith("file://")) source else "file://$source"
+		} else {
+			url = source
+			networking = true
 		}
 		try {
-			if (source.startsWith("asset://")) {
-				fd = binding.applicationContext.assets.openFd(binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8)))
-				mediaPlayer.setDataSource(fd!!)
-			} else {
-				mediaPlayer.setDataSource(source)
-			}
-			mediaPlayer.prepareAsync()
+			exoPlayer.setMediaItem(MediaItem.fromUri(url))
+			exoPlayer.prepare()
+			exoPlayer.setVideoSurface(surface)
+			state = 1U
+			this.source = source
 		} catch (e: Exception) {
 			eventSink?.success(mapOf(
 				"event" to "error",
@@ -175,87 +75,214 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 
 	fun close() {
 		source = null
-		finished = false
-		hasVideo = false
-		state = 0u
+		seeking = false
+		networking = false
+		state = 0U
 		position = 0
 		bufferPosition = 0
 		stillPreparing = false
-		mediaPlayer.setSurface(null)
-		mediaPlayer.reset()
-		fd?.close()
-		fd = null
+		exoPlayer.playWhenReady = false
+		exoPlayer.stop()
+		exoPlayer.clearMediaItems()
+		exoPlayer.setVideoSurface(null)
 	}
 
 	fun play() {
-		if (state.compareTo(2u) == 0) {
-			finished = false
-			state = 3u
+		if (state.compareTo(2U) == 0) {
+			state = 3U
 			justPlay()
+			if (exoPlayer.playbackState == Player.STATE_BUFFERING) {
+				eventSink?.success(mapOf(
+					"event" to "loading",
+					"value" to true
+				))
+			}
 		}
 	}
 
 	fun pause() {
-		if (state > 2u) {
-			state = 2u
-			mediaPlayer.pause()
+		if (state > 2U) {
+			state = 2U
+			exoPlayer.playWhenReady = false
 		}
 	}
 
-	fun seekTo(pos: Int) {
-		if (mediaPlayer.duration <= 0 || mediaPlayer.currentPosition == pos) {
+	fun seekTo(pos: Long) {
+		if (exoPlayer.isCurrentMediaItemLive || exoPlayer.currentPosition == pos) {
 			eventSink?.success(mapOf("event" to "seekEnd"))
 		} else {
-			finished = false
-			mediaPlayer.seekTo(pos.toLong(), MediaPlayer.SEEK_CLOSEST)
+			seeking = true
+			exoPlayer.seekTo(pos)
 		}
 	}
 
 	fun setVolume(vol: Float) {
 		volume = vol
-		mediaPlayer.setVolume(vol, vol)
+		exoPlayer.volume = vol
 	}
 
 	fun setSpeed(spd: Float) {
 		speed = spd
-		if (mediaPlayer.isPlaying) {
-			mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(spd)
-		}
+		exoPlayer.playbackParameters = exoPlayer.playbackParameters.withSpeed(speed)
 	}
 
 	fun setLooping(loop: Boolean) {
 		looping = loop
 	}
 
+	private fun seekEnd() {
+		seeking = false
+		if (!watching) {
+			watchPosition()
+		}
+		eventSink?.success(mapOf("event" to "seekEnd"))
+	}
+
 	private fun justPlay() {
-		mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
-		if (!watching && mediaPlayer.duration > 0) {
+		if (exoPlayer.playbackState == Player.STATE_ENDED) {
+			exoPlayer.seekTo(0)
+		}
+		exoPlayer.playWhenReady = true
+		if (!watching && !exoPlayer.isCurrentMediaItemLive) {
 			startWatcher()
+		}
+	}
+
+	private fun startBuffering() {
+		buffering = true
+		handler.postDelayed({
+			if (state > 0U && networking && exoPlayer.isLoading && !exoPlayer.isCurrentMediaItemLive) {
+				startBuffering()
+				watchBuffer()
+			} else {
+				buffering = false
+			}
+		}, 100)
+	}
+
+	private fun watchBuffer() {
+		val bufferPos = exoPlayer.bufferedPosition
+		if (bufferPos != bufferPosition && bufferPos > exoPlayer.currentPosition) {
+			bufferPosition = bufferPos
+			eventSink?.success(mapOf(
+				"event" to "buffer",
+				"begin" to exoPlayer.currentPosition,
+				"end" to bufferPosition
+			))
 		}
 	}
 
 	private fun startWatcher() {
 		watching = true
 		handler.postDelayed({
-			if (mediaPlayer.isPlaying) {
+			if (state > 2U && !exoPlayer.isCurrentMediaItemLive) {
 				startWatcher()
 			} else {
 				watching = false
 			}
-			if (watching || !finished) {
-				watchPosition()
-			}
-		}, 100)
+			watchPosition()
+		}, 10)
 	}
 
 	private fun watchPosition() {
-		val pos = mediaPlayer.currentPosition
+		val pos = exoPlayer.currentPosition
 		if (pos != position) {
 			position = pos
 			eventSink?.success(mapOf(
 				"event" to "position",
 				"value" to pos
 			))
+		}
+	}
+
+	override fun onVideoSizeChanged(videoSize: VideoSize) {
+		super.onVideoSizeChanged(videoSize)
+		if (state > 0U) {
+			var w = 0F
+			var h = 0F
+			if (videoSize.unappliedRotationDegrees % 180 == 0) {
+				w = round(videoSize.width * videoSize.pixelWidthHeightRatio)
+				h = videoSize.height.toFloat()
+			} else {
+				w = videoSize.height.toFloat()
+				h = round(videoSize.width * videoSize.pixelWidthHeightRatio)
+			}
+			eventSink?.success(mapOf(
+				"event" to "videoSize",
+				"width" to w,
+				"height" to h
+			))
+		}
+	}
+
+	override fun onPlayerError(error: PlaybackException) {
+		super.onPlayerError(error)
+		if (state > 0U) {
+			close()
+			eventSink?.success(mapOf(
+				"event" to "error",
+				"value" to error.errorCodeName
+			))
+		}
+	}
+
+	override fun onPlaybackStateChanged(playbackState: Int) {
+		super.onPlaybackStateChanged(playbackState)
+		if (seeking && (playbackState == Player.STATE_READY || playbackState == Player.STATE_ENDED)) {
+			seekEnd()
+		} else if (playbackState == Player.STATE_READY) {
+			if (state.compareTo(1U) == 0) {
+				state = 2U
+				exoPlayer.volume = volume
+				eventSink?.success(mapOf(
+					"event" to "mediaInfo",
+					"duration" to if (exoPlayer.isCurrentMediaItemLive) 0 else exoPlayer.duration,
+					"source" to source
+				))
+			} else if (state > 2U) {
+				eventSink?.success(mapOf(
+					"event" to "loading",
+					"value" to false
+				))
+			}
+		} else if (playbackState == Player.STATE_ENDED) {
+			if (state > 1U && !exoPlayer.isCurrentMediaItemLive) {
+				eventSink?.success(mapOf(
+					"event" to "position",
+					"value" to exoPlayer.duration
+				))
+			}
+			if (state > 2U) {
+				if (exoPlayer.isCurrentMediaItemLive) {
+					close()
+				} else if (looping) {
+					justPlay()
+				} else {
+					state = 2U
+				}
+				eventSink?.success(mapOf("event" to "finished"))
+			}
+		} else if (playbackState == Player.STATE_BUFFERING) {
+			if (state > 2U) {
+				eventSink?.success(mapOf(
+					"event" to "loading",
+					"value" to true
+				))
+			}
+		}
+	}
+
+	override fun onIsLoadingChanged(isLoading: Boolean) {
+		super.onIsLoadingChanged(isLoading)
+		if (networking && !exoPlayer.isCurrentMediaItemLive) {
+			if (isLoading) {
+				if (!buffering) {
+					startBuffering()
+				}
+			} else if (buffering) {
+				buffering = false
+				watchBuffer()
+			}
 		}
 	}
 
@@ -270,7 +297,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 
 class AvMediaPlayerPlugin: FlutterPlugin {
 	private lateinit var methodChannel: MethodChannel
-	private val players = mutableMapOf<Long, AvMediaPlayer>()
+	private val players = mutableMapOf<Int, AvMediaPlayer>()
 
 	private fun clear() {
 		for (player in players.values) {
@@ -282,70 +309,54 @@ class AvMediaPlayerPlugin: FlutterPlugin {
 	override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
 		methodChannel = MethodChannel(binding.binaryMessenger, "av_media_player")
 		methodChannel.setMethodCallHandler { call, result ->
+			var returned = false
 			when (call.method) {
 				"create" -> {
 					val player = AvMediaPlayer(binding)
 					players[player.id] = player
 					result.success(player.id)
+					returned = true
 				}
 				"dispose" -> {
-					result.success(null)
-					if (call.arguments == null) {
-						clear()
-					} else {
-						val id = (call.arguments as Int).toLong()
+					val id = call.arguments
+					if (id is Int) {
 						players[id]?.dispose()
 						players.remove(id)
+					} else {
+						clear()
 					}
 				}
 				"open" -> {
-					result.success(null)
-					val id = call.argument<Long>("id")!!
-					val source = call.argument<String>("value")!!
-					players[id]?.open(source)
+					players[call.argument<Int>("id")!!]?.open(call.argument<String>("value")!!)
 				}
 				"close" -> {
-					result.success(null)
-					val id = (call.arguments as Int).toLong()
-					players[id]?.close()
+					players[call.arguments as Int]?.close()
 				}
 				"play" -> {
-					result.success(null)
-					val id = (call.arguments as Int).toLong()
-					players[id]?.play()
+					players[call.arguments as Int]?.play()
 				}
 				"pause" -> {
-					result.success(null)
-					val id = (call.arguments as Int).toLong()
-					players[id]?.pause()
+					players[call.arguments as Int]?.pause()
 				}
 				"seekTo" -> {
-					val id = call.argument<Long>("id")!!
-					val pos = call.argument<Int>("value")!!
-					players[id]?.seekTo(pos)
-					result.success(null)
+					players[call.argument<Int>("id")!!]?.seekTo(call.argument<Long>("value")!!)
 				}
 				"setVolume" -> {
-					result.success(null)
-					val id = call.argument<Long>("id")!!
-					val vol = call.argument<Float>("value")!!
-					players[id]?.setVolume(vol)
+					players[call.argument<Int>("id")!!]?.setVolume(call.argument<Float>("value")!!)
 				}
 				"setSpeed" -> {
-					result.success(null)
-					val id = call.argument<Long>("id")!!
-					val spd = call.argument<Float>("value")!!
-					players[id]?.setSpeed(spd)
+					players[call.argument<Int>("id")!!]?.setSpeed(call.argument<Float>("value")!!)
 				}
 				"setLooping" -> {
-					result.success(null)
-					val id = call.argument<Long>("id")!!
-					val looping = call.argument<Boolean>("value")!!
-					players[id]?.setLooping(looping)
+					players[call.argument<Int>("id")!!]?.setLooping(call.argument<Boolean>("value")!!)
 				}
 				else -> {
 					result.notImplemented()
+					returned = true
 				}
+			}
+			if (!returned) {
+				result.success(null)
 			}
 		}
 	}
