@@ -1,3 +1,7 @@
+## 1.0.6
+
+- fixed hls detection issue on android.
+
 ## 1.0.5
 
 - fixed a critical issue on ios/macos that may antifact the video.

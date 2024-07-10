@@ -11,7 +11,7 @@ class VideoListView extends StatefulWidget {
   const VideoListView({super.key});
 
   @override
-  State<StatefulWidget> createState() => _VideoListView();
+  State<VideoListView> createState() => _VideoListView();
 }
 
 class _VideoListView extends State<VideoListView> with SetStateAsync {
