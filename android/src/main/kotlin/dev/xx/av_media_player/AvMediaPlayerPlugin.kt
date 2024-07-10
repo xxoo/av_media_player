@@ -5,6 +5,7 @@ import android.os.Handler
 import android.view.Surface
 import androidx.media3.common.VideoSize
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
@@ -60,7 +61,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			networking = true
 		}
 		try {
-			exoPlayer.setMediaItem(MediaItem.fromUri(url))
+			exoPlayer.setMediaItem(if (url.contains(".m3u8")) MediaItem.Builder().setMimeType(MimeTypes.APPLICATION_M3U8).setUri(url).build() else MediaItem.fromUri(url))
 			exoPlayer.prepare()
 			exoPlayer.setVideoSurface(surface)
 			state = 1U
