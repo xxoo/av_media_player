@@ -18,9 +18,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: flutter/flutter
+          fetch-depth: 0
           ref: stable
           path: build
 
       - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
       
-      - run: export PATH=build/bin:$PATH;flutter pub get;flutter pub publish -f
+      - run: build/bin/flutter pub get
+      
+      - run: build/bin/flutter pub publish -f
