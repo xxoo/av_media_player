@@ -19,12 +19,8 @@ jobs:
         with:
           repository: flutter/flutter
           ref: stable
-          path: flutter
+          path: ../flutter
 
       - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
       
-      - run: export PATH=$CWD/flutter/bin:#PATH
-      
-      - run: flutter pub get
-      
-      - run: flutter pub publish -f
+      - run: export PATH=../flutter/bin:#PATH;flutter pub get;flutter pub publish -f
