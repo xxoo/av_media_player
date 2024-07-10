@@ -23,8 +23,8 @@ jobs:
 
       - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
       
-      - run: flutter/bin/flutter doctor
+      - run: export PATH=$CWD/flutter/bin:#PATH
       
-      - run: flutter/bin/flutter pub get
+      - run: flutter pub get
       
-      - run: flutter/bin/flutter pub publish -f
+      - run: flutter pub publish -f
