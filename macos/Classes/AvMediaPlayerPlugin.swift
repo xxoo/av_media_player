@@ -1,1 +1,0 @@
-../../ios/Classes/AVMediaPlayerPlugin.swift
