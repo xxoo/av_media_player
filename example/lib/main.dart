@@ -16,14 +16,14 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   var _loading = true;
-
   @override
   Widget build(BuildContext context) => Stack(
+        textDirection: TextDirection.ltr,
         alignment: Alignment.center,
         children: [
           AvMediaView(
             initSource:
-                'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_adv_example_hevc/master.m3u8',
+                'https://test-streams.mux.dev/x36xhzz/url_6/193039199_mp4_h264_aac_hq_7.m3u8',
             initLooping: true,
             initAutoPlay: true,
             onCreated: (player) => player.loading.addListener(

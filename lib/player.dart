@@ -15,12 +15,78 @@ class BufferRange {
   const BufferRange(this.begin, this.end);
 }
 
+/// This type is used by [TrackInfo], for showing the type of the track.
+enum TrackType { audio, video, subtitle }
+
+/// This type is used by [MediaInfo], for showing information about a track.
+/// Only [type] is guaranteed to be non-null. Other information may not be available. And can be different on different platforms.
+class TrackInfo {
+  static TrackInfo fromMap(Map map) {
+    final type = map['type'] as String;
+    final format = map['format'] as String?;
+    final language = map['language'] as String?;
+    final title = map['title'] as String?;
+    final bitRate = map['bitRate'] as int?;
+    final videoSize = map['width'] == null ||
+            map['height'] == null ||
+            map['width'] <= 0 ||
+            map['height'] <= 0
+        ? null
+        : Size(map['width'].toDouble(), map['height'].toDouble());
+    final frameRate = map['frameRate'] as double?;
+    final channels = map['channels'] as int?;
+    final sampleRate = map['sampleRate'] as int?;
+    final isHdr = map['isHdr'] as bool?;
+    return TrackInfo(
+      type == 'audio'
+          ? TrackType.audio
+          : type == 'video'
+              ? TrackType.video
+              : TrackType.subtitle,
+      format: format == "" ? null : format,
+      language: language == "" ? null : language,
+      title: title == "" ? null : title,
+      isHdr: isHdr,
+      videoSize: videoSize,
+      frameRate: frameRate != null && frameRate > 0 ? frameRate : null,
+      bitRate: bitRate != null && bitRate > 0 ? bitRate : null,
+      channels: channels != null && channels > 0 ? channels : null,
+      sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : null,
+    );
+  }
+
+  final TrackType type;
+  final String? format;
+  final String? language;
+  final String? title;
+  final int? bitRate;
+  final Size? videoSize;
+  final double? frameRate;
+  final int? channels;
+  final int? sampleRate;
+  final bool? isHdr;
+  const TrackInfo(
+    this.type, {
+    this.isHdr,
+    this.format,
+    this.language,
+    this.title,
+    this.videoSize,
+    this.frameRate,
+    this.bitRate,
+    this.channels,
+    this.sampleRate,
+  });
+}
+
 /// This type is used by [AvMediaPlayer], for showing current media info.
 /// If duration is 0, it means the media is a realtime stream
+/// [tracks] contains all the tracks of the media. The key is the track id. However, video tracks may not available on ios/macos/windows.
 class MediaInfo {
   final int duration;
+  final Map<String, TrackInfo> tracks;
   final String source;
-  const MediaInfo(this.duration, this.source);
+  const MediaInfo(this.duration, this.tracks, this.source);
 }
 
 /// The class to create and control [AvMediaPlayer] instance.
@@ -32,6 +98,10 @@ class AvMediaPlayer {
 
   /// Whether the player is disposed.
   var disposed = false;
+
+  /// The id of the subtitle texture if available.
+  /// This value does not change after the player is initialized.
+  int? subId;
 
   /// The id of the player. It's null before the player is initialized.
   /// After the player is initialized it will be unique and never change again.
@@ -82,8 +152,27 @@ class AvMediaPlayer {
   final finishedTimes = ValueNotifier(0);
 
   /// The current buffer status of the player.
-  /// It is only reported for network media.
+  /// It is only reported by network media.
   final bufferRange = ValueNotifier(BufferRange.empty);
+
+  /// The tracks that are overrided by the player.
+  final overrideTracks = ValueNotifier<Set<String>>({});
+
+  /// Current maximum bit rate of the player. 0 means no limit.
+  final maxBitRate = ValueNotifier(0);
+
+  /// Current maximum resolution of the player. [Size.zero] means no limit.
+  final maxResolution = ValueNotifier(Size.zero);
+
+  /// The preferred audio language of the player.
+  final preferredAudioLanguage = ValueNotifier<String>('');
+
+  /// The preferred subtitle language of the player.
+  final preferredSubtitleLanguage = ValueNotifier<String>('');
+
+  /// Whether to show subtitles.
+  /// By default, the player does not show any subtitles. Regardless of the preferred subtitle language or override tracks.
+  final showSubtitle = ValueNotifier(false);
 
   // Event channel is much more efficient than method channel
   // We'd better use it to hanel playback events especially for position
@@ -100,6 +189,11 @@ class AvMediaPlayer {
     bool? initLooping,
     bool? initAutoPlay,
     int? initPosition,
+    bool? initShowSubtitle,
+    String? initPreferredSubtitleLanguage,
+    String? initPreferredAudioLanguage,
+    int? initMaxBitRate,
+    Size? initMaxResolution,
   }) {
     if (kDebugMode && !_detectorStarted) {
       _detectorStarted = true;
@@ -115,9 +209,10 @@ class AvMediaPlayer {
     }
     _methodChannel.invokeMethod('create').then((value) {
       if (disposed) {
-        _methodChannel.invokeMethod('dispose', value);
+        _methodChannel.invokeMethod('dispose', value['id']);
       } else {
-        id.value = value as int;
+        subId = value['subId'];
+        id.value = value['id'];
         _eventSubscription = EventChannel('av_media_player/${id.value}')
             .receiveBroadcastStream()
             .listen((event) {
@@ -126,7 +221,11 @@ class AvMediaPlayer {
             if (_source == e['source']) {
               loading.value = false;
               playbackState.value = PlaybackState.paused;
-              mediaInfo.value = MediaInfo(e['duration'], _source!);
+              mediaInfo.value = MediaInfo(
+                  e['duration'],
+                  (e['tracks'] as Map).map(
+                      (k, v) => MapEntry(k as String, TrackInfo.fromMap(v))),
+                  _source!);
               if (autoPlay.value) {
                 play();
               }
@@ -173,13 +272,8 @@ class AvMediaPlayer {
             if (playbackState.value != PlaybackState.closed || loading.value) {
               _source = null;
               error.value = e['value'];
-              mediaInfo.value = null;
-              videoSize.value = Size.zero;
-              position.value = 0;
-              bufferRange.value = BufferRange.empty;
-              finishedTimes.value = 0;
               loading.value = false;
-              playbackState.value = PlaybackState.closed;
+              _close();
             }
           } else if (e['event'] == 'loading') {
             if (mediaInfo.value != null) {
@@ -206,22 +300,28 @@ class AvMediaPlayer {
           open(_source!);
         }
         if (volume.value != 1) {
-          _methodChannel.invokeMethod('setVolume', {
-            'id': value,
-            'value': volume.value,
-          });
+          _setVolume();
         }
         if (speed.value != 1) {
-          _methodChannel.invokeMethod('setSpeed', {
-            'id': value,
-            'value': speed.value,
-          });
+          _setSpeed();
         }
         if (looping.value) {
-          _methodChannel.invokeMethod('setLooping', {
-            'id': value,
-            'value': true,
-          });
+          _setLooping();
+        }
+        if (maxBitRate.value > 0) {
+          _setMaxBitRate();
+        }
+        if (maxResolution.value != Size.zero) {
+          _setMaxResolution();
+        }
+        if (preferredAudioLanguage.value.isNotEmpty) {
+          _setPreferredAudioLanguage();
+        }
+        if (preferredSubtitleLanguage.value.isNotEmpty) {
+          _setPreferredSubtitleLanguage();
+        }
+        if (showSubtitle.value) {
+          _setShowSubtitle();
         }
       }
     });
@@ -240,6 +340,21 @@ class AvMediaPlayer {
     }
     if (initAutoPlay != null) {
       setAutoPlay(initAutoPlay);
+    }
+    if (initMaxBitRate != null) {
+      setMaxBitRate(initMaxBitRate);
+    }
+    if (initMaxResolution != null) {
+      setMaxResolution(initMaxResolution);
+    }
+    if (initPreferredAudioLanguage != null) {
+      setPreferredAudioLanguage(initPreferredAudioLanguage);
+    }
+    if (initPreferredSubtitleLanguage != null) {
+      setPreferredSubtitleLanguage(initPreferredSubtitleLanguage);
+    }
+    if (initShowSubtitle != null) {
+      setShowSubtitle(initShowSubtitle);
     }
   }
 
@@ -263,6 +378,13 @@ class AvMediaPlayer {
       looping.dispose();
       autoPlay.dispose();
       finishedTimes.dispose();
+      bufferRange.dispose();
+      overrideTracks.dispose();
+      maxBitRate.dispose();
+      maxResolution.dispose();
+      preferredAudioLanguage.dispose();
+      preferredSubtitleLanguage.dispose();
+      showSubtitle.dispose();
     }
   }
 
@@ -274,12 +396,7 @@ class AvMediaPlayer {
       _source = source;
       if (id.value != null) {
         error.value = null;
-        mediaInfo.value = null;
-        videoSize.value = Size.zero;
-        position.value = 0;
-        bufferRange.value = BufferRange.empty;
-        finishedTimes.value = 0;
-        playbackState.value = PlaybackState.closed;
+        _close();
         _methodChannel.invokeMethod('open', {
           'id': id.value,
           'value': source,
@@ -296,12 +413,7 @@ class AvMediaPlayer {
       if (id.value != null &&
           (playbackState.value != PlaybackState.closed || loading.value)) {
         _methodChannel.invokeMethod('close', id.value);
-        mediaInfo.value = null;
-        videoSize.value = Size.zero;
-        position.value = 0;
-        bufferRange.value = BufferRange.empty;
-        finishedTimes.value = 0;
-        playbackState.value = PlaybackState.closed;
+        _close();
       }
       loading.value = false;
     }
@@ -387,11 +499,8 @@ class AvMediaPlayer {
         volume = 1;
       }
       if (this.volume.value != volume) {
-        _methodChannel.invokeMethod('setVolume', {
-          'id': id.value,
-          'value': volume,
-        });
         this.volume.value = volume;
+        _setVolume();
         return true;
       }
     }
@@ -409,13 +518,10 @@ class AvMediaPlayer {
         speed = 2;
       }
       if (this.speed.value != speed) {
-        if (id.value != null) {
-          _methodChannel.invokeMethod('setSpeed', {
-            'id': id.value,
-            'value': speed,
-          });
-        }
         this.speed.value = speed;
+        if (id.value != null) {
+          _setSpeed();
+        }
         return true;
       }
     }
@@ -425,13 +531,10 @@ class AvMediaPlayer {
   /// Set whether the player should loop the media.
   bool setLooping(bool looping) {
     if (!disposed && looping != this.looping.value) {
-      if (id.value != null) {
-        _methodChannel.invokeMethod('setLooping', {
-          'id': id.value,
-          'value': looping,
-        });
-      }
       this.looping.value = looping;
+      if (id.value != null) {
+        _setLooping();
+      }
       return true;
     }
     return false;
@@ -444,5 +547,157 @@ class AvMediaPlayer {
       return true;
     }
     return false;
+  }
+
+  /// Set the maximum resolution of the player.
+  /// This method may not work on windows.
+  bool setMaxResolution(Size resolution) {
+    if (!disposed &&
+        resolution.width >= 0 &&
+        resolution.height >= 0 &&
+        (resolution.width != maxResolution.value.width ||
+            resolution.height != maxResolution.value.height)) {
+      maxResolution.value = resolution;
+      if (id.value != null) {
+        _setMaxResolution();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Set the maximum bit rate of the player.
+  /// This method may not work on windows.
+  bool setMaxBitRate(int bitrate) {
+    if (!disposed && bitrate >= 0 && bitrate != maxBitRate.value) {
+      maxBitRate.value = bitrate;
+      if (id.value != null) {
+        _setMaxBitRate();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Set the preferred audio language of the player.
+  /// An empty string means using the system default.
+  bool setPreferredAudioLanguage(String language) {
+    if (!disposed && language != preferredAudioLanguage.value) {
+      preferredAudioLanguage.value = language;
+      if (id.value != null) {
+        _setPreferredAudioLanguage();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Set the preferred subtitle language of the player.
+  /// An empty string means using the system default.
+  bool setPreferredSubtitleLanguage(String language) {
+    if (!disposed && language != preferredSubtitleLanguage.value) {
+      preferredSubtitleLanguage.value = language;
+      if (id.value != null) {
+        _setPreferredSubtitleLanguage();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Set whether to show subtitles.
+  bool setShowSubtitle(bool show) {
+    if (!disposed && show != showSubtitle.value) {
+      showSubtitle.value = show;
+      if (id.value != null) {
+        _setShowSubtitle();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// Force the player to override a track. Or cancel the override.
+  /// The [trackId] is a key of [MediaInfo.tracks].
+  bool overrideTrack(String trackId, bool enabled) {
+    if (!disposed &&
+        mediaInfo.value != null &&
+        mediaInfo.value!.tracks.containsKey(trackId) &&
+        overrideTracks.value.contains(trackId) != enabled) {
+      final ids = trackId.split('.');
+      _methodChannel.invokeMethod('overrideTrack', {
+        'id': id.value,
+        'groupId': int.parse(ids[0]),
+        'trackId': int.parse(ids[1]),
+        'value': enabled,
+      });
+      if (enabled) {
+        final newTracks = overrideTracks.value.difference(overrideTracks.value
+            .where((id) =>
+                id != trackId &&
+                mediaInfo.value!.tracks[id]!.type ==
+                    mediaInfo.value!.tracks[trackId]!.type)
+            .toSet());
+        newTracks.add(trackId);
+        overrideTracks.value = newTracks;
+      } else {
+        overrideTracks.value = overrideTracks.value.difference({trackId});
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void _setMaxResolution() => _methodChannel.invokeMethod('setMaxResolution', {
+        'id': id.value,
+        'width': maxResolution.value.width,
+        'height': maxResolution.value.height,
+      });
+
+  void _setMaxBitRate() => _methodChannel.invokeMethod('setMaxBitRate', {
+        'id': id.value,
+        'value': maxBitRate.value,
+      });
+
+  void _setVolume() => _methodChannel.invokeMethod('setVolume', {
+        'id': id.value,
+        'value': volume.value,
+      });
+
+  void _setSpeed() => _methodChannel.invokeMethod('setSpeed', {
+        'id': id.value,
+        'value': speed.value,
+      });
+
+  void _setLooping() => _methodChannel.invokeMethod('setLooping', {
+        'id': id.value,
+        'value': looping.value,
+      });
+
+  void _setPreferredAudioLanguage() =>
+      _methodChannel.invokeMethod('setPreferredAudioLanguage', {
+        'id': id.value,
+        'value': preferredAudioLanguage.value,
+      });
+
+  void _setPreferredSubtitleLanguage() =>
+      _methodChannel.invokeMethod('setPreferredSubtitleLanguage', {
+        'id': id.value,
+        'value': preferredSubtitleLanguage.value,
+      });
+
+  void _setShowSubtitle() => _methodChannel.invokeMethod('setShowSubtitle', {
+        'id': id.value,
+        'value': showSubtitle.value,
+      });
+
+  void _close() {
+    mediaInfo.value = null;
+    videoSize.value = Size.zero;
+    position.value = 0;
+    bufferRange.value = BufferRange.empty;
+    finishedTimes.value = 0;
+    playbackState.value = PlaybackState.closed;
+    overrideTracks.value = {};
   }
 }

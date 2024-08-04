@@ -9,8 +9,9 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	var id: Int64!
 	private let textureRegistry: FlutterTextureRegistry
 	private let avPlayer = AVPlayer()
+	private let subtitleLayer = AVPlayerLayer()
 	private var eventChannel: FlutterEventChannel!
-	private var output: AVPlayerItemVideoOutput?
+	private var videoOutput: AVPlayerItemVideoOutput?
 	private var eventSink: FlutterEventSink?
 	private var watcher: Any?
 	private var position = CMTime.zero
@@ -22,14 +23,28 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 	private var rendering: CMTime?
 	private var state: UInt8 = 0 //0: idle, 1: opening, 2: ready, 3: playing
 	private var source: String?
+	private var mediaGroups: [AVMediaSelectionGroup] = []
+	private var maxWidth = 0.0
+	private var maxHeight = 0.0
+	private var maxBitrate = 0.0
+	private var showSubtitle = false
 
 #if os(macOS)
 	private var displayLink: CVDisplayLink?
+	private func displlayCallback(outputTime: CVTimeStamp) {
+		if displayLink != nil {
+			let t = videoOutput!.itemTime(for: outputTime)
+			if reading != t && rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
+				textureRegistry.textureFrameAvailable(id)
+				reading = t
+			}
+		}
+	}
 #else
 	private var displayLink: CADisplayLink?
 	@objc private func displayCallback() {
 		if displayLink != nil {
-			let t = output!.itemTime(forHostTime: displayLink!.targetTimestamp)
+			let t = videoOutput!.itemTime(forHostTime: displayLink!.targetTimestamp)
 			if reading != t && rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
 				textureRegistry.textureFrameAvailable(id)
 				reading = t
@@ -50,6 +65,9 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		id = textureRegistry.register(self)
 		eventChannel = FlutterEventChannel(name: "av_media_player/\(id!)", binaryMessenger: messager)
 		eventChannel.setStreamHandler(self)
+		avPlayer.appliesMediaSelectionCriteriaAutomatically = true
+		setPreferredAudioLanguage(language: "")
+		setPreferredSubtitleLanguage(language: "")
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.timeControlStatus), options: .old, context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.status), context: nil)
 		avPlayer.addObserver(self, forKeyPath: #keyPath(AVPlayer.currentItem.loadedTimeRanges), context: nil)
@@ -85,6 +103,10 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			self.source = source
 			state = 1
 			avPlayer.replaceCurrentItem(with: AVPlayerItem(asset: AVAsset(url: uri!)))
+			//AVPlayer.eligibleForHDRPlayback
+			//avPlayer.currentItem!.appliesPerFrameHDRDisplayMetadata = true
+			avPlayer.currentItem!.preferredPeakBitRate = maxBitrate
+			avPlayer.currentItem!.preferredMaximumResolution = maxWidth == 0 && maxHeight == 0 ? CGSizeZero : CGSize(width: maxWidth, height: maxHeight)
 			NotificationCenter.default.addObserver(
 				self,
 				selector: #selector(onFinish(notification:)),
@@ -104,6 +126,7 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		source = nil
 		reading = nil
 		rendering = nil
+		mediaGroups.removeAll()
 		if avPlayer.currentItem != nil {
 			NotificationCenter.default.removeObserver(
 				self,
@@ -159,6 +182,52 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		looping = loop
 	}
 
+	func setMaxBitRate(bitrate: Double) {
+		maxBitrate = bitrate
+		if state > 0 {
+			avPlayer.currentItem!.preferredPeakBitRate = maxBitrate
+		}
+	}
+
+	func setMaxResolution(width: Double, height: Double) {
+		maxWidth = width
+		maxHeight = height
+		if state > 0 {
+			avPlayer.currentItem!.preferredMaximumResolution = maxWidth == 0 && maxHeight == 0 ? CGSizeZero : CGSize(width: maxWidth, height: maxHeight)
+		}
+	}
+
+	func setPreferredAudioLanguage(language: String) {
+		avPlayer.setMediaSelectionCriteria(AVPlayerMediaSelectionCriteria(
+			preferredLanguages: language.isEmpty ? Locale.preferredLanguages : [language],
+			preferredMediaCharacteristics: nil
+		), forMediaCharacteristic: AVMediaCharacteristic.audible)
+	}
+
+	func setPreferredSubtitleLanguage(language: String) {
+		avPlayer.setMediaSelectionCriteria(AVPlayerMediaSelectionCriteria(
+			preferredLanguages: language.isEmpty ? Locale.preferredLanguages : [language],
+			preferredMediaCharacteristics: nil
+		), forMediaCharacteristic: AVMediaCharacteristic.legible)
+	}
+
+	func setShowSubtitle(show: Bool) {
+		showSubtitle = show
+		subtitleLayer.player = displayLink != nil && showSubtitle ? avPlayer : nil
+	}
+
+	func overrideTrack(groupId: Int, trackId: Int, enabled: Bool) {
+		if state > 1 {
+			let group = mediaGroups[groupId]
+			let option = group.options[trackId]
+			if enabled {
+				avPlayer.currentItem!.select(option, in: group)
+			} else if avPlayer.currentItem!.currentMediaSelection.selectedMediaOption(in: group) == option {
+				avPlayer.currentItem!.selectMediaOptionAutomatically(in: group)
+			}
+		}
+	}
+
 	private func justPlay() {
 		if position == avPlayer.currentItem!.duration {
 			avPlayer.seek(to: .zero) { [weak self] finished in
@@ -181,13 +250,16 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			avPlayer.rate = speed
 		}
 	}
-	
+
 	private func createOutput() {
-		output = AVPlayerItemVideoOutput(pixelBufferAttributes: [
+		videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: [
 			String(kCVPixelBufferIOSurfacePropertiesKey): [:],
 			String(kCVPixelBufferPixelFormatTypeKey): kCVPixelFormatType_32BGRA
 		])
-		avPlayer.currentItem!.add(output!)
+		avPlayer.currentItem!.add(videoOutput!)
+		if showSubtitle {
+			subtitleLayer.player = avPlayer
+		}
 	}
 
 	private func stopVideo() {
@@ -199,9 +271,12 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 #endif
 			displayLink = nil
 		}
-		if output != nil {
-			avPlayer.currentItem?.remove(output!)
-			output = nil
+		if videoOutput != nil {
+			avPlayer.currentItem?.remove(videoOutput!)
+			videoOutput = nil
+		}
+		if showSubtitle {
+			subtitleLayer.player = nil
 		}
 	}
 
@@ -220,17 +295,6 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 				"value": Int(position.seconds * 1000)
 			])
 		}
-	}
-
-	func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
-		if let t = reading {
-			reading = nil
-			if let buffer = output?.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: nil) {
-				rendering = t
-				return Unmanaged.passRetained(buffer)
-			}
-		}
-		return nil
 	}
 
 	@objc private func onFinish(notification: NSNotification) {
@@ -264,12 +328,41 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		return nil
 	}
 
+	func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
+		if let t = reading {
+			reading = nil
+			if let pixelBuffer = videoOutput?.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: nil) {
+				rendering = t
+				if showSubtitle && CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly) == kCVReturnSuccess {
+					if let context = CGContext(
+						data: CVPixelBufferGetBaseAddress(pixelBuffer),
+						width: CVPixelBufferGetWidth(pixelBuffer),
+						height: CVPixelBufferGetHeight(pixelBuffer),
+						bitsPerComponent: 8,
+						bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+						space: CGColorSpaceCreateDeviceRGB(),
+						bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue.littleEndian) {
+#if !os(macOS)
+						context.translateBy(x: 0, y: CGFloat(context.height))
+						context.scaleBy(x: 1, y: -1)
+#endif
+						subtitleLayer.frame = CGRect(x: 0, y: 0, width: context.width, height: context.height)
+						subtitleLayer.render(in: context)
+					}
+					CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+				}
+				return Unmanaged.passRetained(pixelBuffer)
+			}
+		}
+		return nil
+	}
+
 	override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
 		switch keyPath {
 		case #keyPath(AVPlayer.timeControlStatus):
 			if let oldValue = change?[NSKeyValueChangeKey.oldKey] as? Int,
-				let oldStatus = AVPlayer.TimeControlStatus(rawValue: oldValue),
-				state > 2 && (oldStatus == .waitingToPlayAtSpecifiedRate || avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate) {
+				 let oldStatus = AVPlayer.TimeControlStatus(rawValue: oldValue),
+				 state > 2 && (oldStatus == .waitingToPlayAtSpecifiedRate || avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate) {
 				eventSink?([
 					"event": "loading",
 					"value": avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate
@@ -278,14 +371,47 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 		case #keyPath(AVPlayer.currentItem.status):
 			switch avPlayer.currentItem?.status {
 			case .readyToPlay:
-				if state == 1 {
-					avPlayer.volume = volume
-					state = 2
-					eventSink?([
-						"event": "mediaInfo",
-						"duration": avPlayer.currentItem!.duration.seconds > 0 ? Int(avPlayer.currentItem!.duration.seconds * 1000) : 0,
-						"source": source!
-					])
+				Task { @MainActor in
+					if state == 1 && avPlayer.currentItem?.status == .readyToPlay {
+						var tracks: [String: [String: String?]] = [:]
+						if let characteristics = try? await avPlayer.currentItem!.asset.load(.availableMediaCharacteristicsWithMediaSelectionOptions) {
+							for characteristic in characteristics {
+								if let group = try? await avPlayer.currentItem!.asset.loadMediaSelectionGroup(for: characteristic) {
+									let i = mediaGroups.count
+									mediaGroups.append(group)
+									for j in 0...group.options.count - 1 {
+										if group.options[j].isPlayable {
+											let type = if group.options[j].mediaType == .audio {
+												"audio"
+											} else if (group.options[j].mediaType == .video) {
+												"video"
+											} else if (group.options[j].mediaType == .subtitle || group.options[j].mediaType == .closedCaption) {
+												"sub"
+											} else {
+												""
+											}
+											if type != "" {
+												let key = "\(i).\(j)"
+												tracks[key] = [
+													"type": type,
+													"title": group.options[j].displayName,
+													"language": group.options[j].locale?.identifier ?? group.options[j].extendedLanguageTag
+												]
+											}
+										}
+									}
+								}
+							}
+						}
+						avPlayer.volume = volume
+						state = 2
+						eventSink?([
+							"event": "mediaInfo",
+							"duration": avPlayer.currentItem!.duration.seconds > 0 ? Int(avPlayer.currentItem!.duration.seconds * 1000) : 0,
+							"tracks": tracks,
+							"source": source!
+						])
+					}
 				}
 			case .failed:
 				if state > 0 {
@@ -300,33 +426,29 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			}
 		case #keyPath(AVPlayer.currentItem.presentationSize):
 			if let width = avPlayer.currentItem?.presentationSize.width,
-				let height = avPlayer.currentItem?.presentationSize.height,
-				state > 0 {
+				 let height = avPlayer.currentItem?.presentationSize.height,
+				 state > 0 {
 				if width == 0 || height == 0 {
 					stopVideo()
-				} else if displayLink == nil {
+				} else {
+					if displayLink == nil {
 #if os(macOS)
-					CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-					if displayLink != nil {
-						CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
-							let player: AvMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
-							if player.displayLink != nil {
-								let t = player.output!.itemTime(for: outputTime.pointee)
-								if player.reading != t && player.rendering != t /*&& output!.hasNewPixelBuffer(forItemTime: t) */{
-									player.textureRegistry.textureFrameAvailable(player.id)
-									player.reading = t
-								}
-							}
-							return kCVReturnSuccess
-						}, Unmanaged.passUnretained(self).toOpaque())
-						CVDisplayLinkStart(displayLink!)
-						createOutput()
-					}
+						CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
+						if displayLink != nil {
+							CVDisplayLinkSetOutputCallback(displayLink!, { (displayLink, now, outputTime, flagsIn, flagsOut, context) -> CVReturn in
+								let player: AvMediaPlayer = Unmanaged.fromOpaque(context!).takeUnretainedValue()
+								player.displlayCallback(outputTime: outputTime.pointee)
+								return kCVReturnSuccess
+							}, Unmanaged.passUnretained(self).toOpaque())
+							CVDisplayLinkStart(displayLink!)
+							createOutput()
+						}
 #else
-					displayLink = CADisplayLink(target: self, selector: #selector(displayCallback))
-					displayLink!.add(to: .current, forMode: .common)
-					createOutput()
+						displayLink = CADisplayLink(target: self, selector: #selector(displayCallback))
+						displayLink!.add(to: .current, forMode: .common)
+						createOutput()
 #endif
+					}
 				}
 				eventSink?([
 					"event": "videoSize",
@@ -336,9 +458,9 @@ class AvMediaPlayer: NSObject, FlutterTexture, FlutterStreamHandler {
 			}
 		case #keyPath(AVPlayer.currentItem.loadedTimeRanges):
 			if let duration = avPlayer.currentItem?.duration.seconds,
-				let currentTime = avPlayer.currentItem?.currentTime(),
-				let timeRanges = avPlayer.currentItem?.loadedTimeRanges as? [CMTimeRange],
-				state > 1 && duration > 0 {
+				 let currentTime = avPlayer.currentItem?.currentTime(),
+				 let timeRanges = avPlayer.currentItem?.loadedTimeRanges as? [CMTimeRange],
+				 state > 1 && duration > 0 {
 				for timeRange in timeRanges {
 					let end = timeRange.start + timeRange.duration
 					if timeRange.start <= currentTime && end >= currentTime {
@@ -394,7 +516,7 @@ public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
 		case "create":
 			let player = AvMediaPlayer(registrar: registrar)
 			players[player.id] = player
-			response = player.id
+			response = ["id": player.id]
 		case "dispose":
 			if let id = call.arguments as? Int64 {
 				players[id]?.close()
@@ -423,6 +545,24 @@ public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
 		case "setLooping":
 			let args = call.arguments as! [String: Any]
 			players[args["id"] as! Int64]?.setLooping(loop: args["value"] as! Bool)
+		case "setMaxBitRate":
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setMaxBitRate(bitrate: args["value"] as! Double)
+		case "setMaxResolution":
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setMaxResolution(width: args["width"] as! Double, height: args["height"] as! Double)
+		case "setPreferredAudioLanguage":
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setPreferredAudioLanguage(language: args["value"] as! String)
+		case "setPreferredSubtitleLanguage":
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setPreferredSubtitleLanguage(language: args["value"] as! String)
+		case "setShowSubtitle":
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.setShowSubtitle(show: args["value"] as! Bool)
+		case "overrideTrack":
+			let args = call.arguments as! [String: Any]
+			players[args["id"] as! Int64]?.overrideTrack(groupId: args["groupId"] as! Int, trackId: args["trackId"] as! Int, enabled: args["value"] as! Bool)
 		default:
 			response = FlutterMethodNotImplemented
 		}

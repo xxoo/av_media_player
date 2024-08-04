@@ -1,3 +1,9 @@
+## 1.1.0
+
+- support subtitles on all platforms.
+- support track selection on all platforms.
+- add `setMaxBitRate`, `setMaxResolution`, `setPreferredSubtitleLanguage` and `setPreferredAudioLanguage` methods to `AVMediaPlayer` class.
+
 ## 1.0.6
 
 - fixed hls detection issue on android.

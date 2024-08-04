@@ -17,6 +17,11 @@ class AvMediaView extends StatefulWidget {
   final double? initVolume;
   final double? initSpeed;
   final int? initPosition;
+  final bool? initShowSubtitle;
+  final String? initPreferredSubtitleLanguage;
+  final String? initPreferredAudioLanguage;
+  final int? initMaxBitRate;
+  final Size? initMaxResolution;
 
   /// Create a new [AvMediaView] widget.
   /// If [initPlayer] is null, a new player will be created.
@@ -39,6 +44,11 @@ class AvMediaView extends StatefulWidget {
     this.initVolume,
     this.initSpeed,
     this.initPosition,
+    this.initShowSubtitle,
+    this.initPreferredSubtitleLanguage,
+    this.initPreferredAudioLanguage,
+    this.initMaxBitRate,
+    this.initMaxResolution,
     this.onCreated,
     this.backgroundColor,
     this.sizingMode = SizingMode.keepAspectRatio,
@@ -63,6 +73,11 @@ class _AVMediaState extends State<AvMediaView> with SetStateAsync {
         initVolume: widget.initVolume,
         initSpeed: widget.initSpeed,
         initPosition: widget.initPosition,
+        initShowSubtitle: widget.initShowSubtitle,
+        initPreferredSubtitleLanguage: widget.initPreferredSubtitleLanguage,
+        initPreferredAudioLanguage: widget.initPreferredAudioLanguage,
+        initMaxBitRate: widget.initMaxBitRate,
+        initMaxResolution: widget.initMaxResolution,
       );
     } else {
       _player = widget.initPlayer!;
@@ -85,11 +100,28 @@ class _AVMediaState extends State<AvMediaView> with SetStateAsync {
       if (widget.initPosition != null) {
         _player!.seekTo(widget.initPosition!);
       }
+      if (widget.initShowSubtitle != null) {
+        _player!.setShowSubtitle(widget.initShowSubtitle!);
+      }
+      if (widget.initPreferredSubtitleLanguage != null) {
+        _player!.setPreferredSubtitleLanguage(
+            widget.initPreferredSubtitleLanguage!);
+      }
+      if (widget.initPreferredAudioLanguage != null) {
+        _player!.setPreferredAudioLanguage(widget.initPreferredAudioLanguage!);
+      }
+      if (widget.initMaxBitRate != null) {
+        _player!.setMaxBitRate(widget.initMaxBitRate!);
+      }
+      if (widget.initMaxResolution != null) {
+        _player!.setMaxResolution(widget.initMaxResolution!);
+      }
     }
     if (widget.onCreated != null) {
       widget.onCreated!(_player!);
     }
     _player!.videoSize.addListener(_update);
+    _player!.showSubtitle.addListener(_update);
   }
 
   @override
@@ -106,6 +138,7 @@ class _AVMediaState extends State<AvMediaView> with SetStateAsync {
       _player?.dispose();
     } else if (!_player!.disposed) {
       _player?.videoSize.removeListener(_update);
+      _player?.showSubtitle.removeListener(_update);
     }
     super.dispose();
   }
@@ -113,7 +146,16 @@ class _AVMediaState extends State<AvMediaView> with SetStateAsync {
   @override
   Widget build(BuildContext context) {
     if (_player!.videoSize.value != Size.zero) {
-      final texture = Texture(textureId: _player!.id.value!);
+      final texture = _player!.subId != null && _player!.showSubtitle.value
+          ? Stack(
+              textDirection: TextDirection.ltr,
+              fit: StackFit.passthrough,
+              children: [
+                Texture(textureId: _player!.id.value!),
+                Texture(textureId: _player!.subId!),
+              ],
+            )
+          : Texture(textureId: _player!.id.value!);
       if (widget.sizingMode == SizingMode.keepAspectRatio) {
         return AspectRatio(
           aspectRatio:

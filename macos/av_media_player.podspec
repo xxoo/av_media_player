@@ -4,10 +4,10 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'av_media_player'
-  s.version          = '1.0.6'
+  s.version          = '1.1.0'
   s.summary          = 'A lightweight media player for flutter.'
   s.description      = <<-DESC
-A lightweight media player for flutter that builds on system components. Video rendering in Texture widget.
+A lightweight media player for flutter.
                        DESC
   s.homepage         = 'http://github.com/xxoo/av_media_player'
   s.license          = { :file => '../LICENSE' }
@@ -17,7 +17,7 @@ A lightweight media player for flutter that builds on system components. Video r
   s.source_files     = 'Classes/**/*'
   s.dependency 'FlutterMacOS'
 
-  s.platform = :osx, '11.0'
+  s.platform = :osx, '12.0'
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.swift_version = '5.0'
 end

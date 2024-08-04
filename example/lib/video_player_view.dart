@@ -13,13 +13,14 @@ class VideoPlayerView extends StatefulWidget {
 }
 
 class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
-  final AvMediaPlayer _player = AvMediaPlayer();
+  final AvMediaPlayer _player = AvMediaPlayer(initSource: videoSources.first);
 
   @override
   initState() {
     super.initState();
     _player.playbackState.addListener(() => setState(() {}));
     _player.position.addListener(() => setState(() {}));
+    _player.error.addListener(() => setState(() {}));
     _player.speed.addListener(() => setState(() {}));
     _player.volume.addListener(() => setState(() {}));
     _player.mediaInfo.addListener(() => setState(() {}));
@@ -27,11 +28,6 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
     _player.loading.addListener(() => setState(() {}));
     _player.looping.addListener(() => setState(() {}));
     _player.autoPlay.addListener(() => setState(() {}));
-    _player.error.addListener(() {
-      if (_player.error.value != null) {
-        debugPrint('Error: ${_player.error.value}');
-      }
-    });
     _player.bufferRange.addListener(() {
       if (_player.bufferRange.value != BufferRange.empty) {
         debugPrint(
@@ -76,14 +72,17 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                   ),
                   const SizedBox(height: 16),
                   AspectRatio(
-                    aspectRatio: 16 / 9,
+                    aspectRatio: _player.videoSize.value == Size.zero
+                        ? 16 / 9
+                        : _player.videoSize.value.width /
+                            _player.videoSize.value.height,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         AvMediaView(
                           initPlayer: _player,
                           backgroundColor: Colors.black,
-                          initSource: videoSources.first,
+                          sizingMode: SizingMode.free,
                         ),
                         if (_player.mediaInfo.value != null &&
                             _player.videoSize.value == Size.zero)
@@ -113,6 +112,9 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                             Duration(milliseconds: _player.position.value)),
                       ),
                       const Spacer(),
+                      Text(_player.error.value ??
+                          '${_player.videoSize.value.width.toInt()}x${_player.videoSize.value.height.toInt()}'),
+                      const Spacer(),
                       Text(
                         _formatDuration(Duration(
                             milliseconds:
@@ -134,7 +136,6 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                         icon: const Icon(Icons.stop),
                         onPressed: () => _player.close(),
                       ),
-                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.fast_rewind),
                         onPressed: () =>
@@ -196,7 +197,7 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                 itemCount: videoSources.length,
                 itemBuilder: (context, index) => AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: GestureDetector(
+                  child: InkWell(
                     onTap: () => _player.open(videoSources[index]),
                     child: AvMediaView(
                       initSource: videoSources[index],
