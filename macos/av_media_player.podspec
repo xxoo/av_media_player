@@ -4,10 +4,10 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'av_media_player'
-  s.version          = '1.1.0'
+  s.version          = '1.1.1'
   s.summary          = 'A lightweight media player for flutter.'
   s.description      = <<-DESC
-A lightweight media player for flutter.
+A lightweight Flutter media player with subtitle rendering and track selection, leveraging system components for seamless playback and video rendering via Flutter's Texture widget.
                        DESC
   s.homepage         = 'http://github.com/xxoo/av_media_player'
   s.license          = { :file => '../LICENSE' }

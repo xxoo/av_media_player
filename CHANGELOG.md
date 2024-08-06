@@ -1,3 +1,8 @@
+## 1.1.1
+
+- fix broken windows build
+- fix flutter min version
+
 ## 1.1.0
 
 - support subtitles on all platforms.

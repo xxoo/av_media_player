@@ -1,6 +1,6 @@
 name: av_media_player
-description: "A lightweight media player for flutter."
-version: 1.1.0
+description: "A lightweight Flutter media player with subtitle rendering and track selection, leveraging system components for seamless playback and video rendering via Flutter's Texture widget."
+version: 1.1.1
 repository: "https://github.com/xxoo/av_media_player"
 issue_tracker: "https://github.com/xxoo/av_media_player/issues"
 topics:
@@ -12,7 +12,7 @@ topics:
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
-  flutter: ">=3.22.0"
+  flutter: ">=3.3.0"
 
 dependencies:
   flutter:

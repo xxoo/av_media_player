@@ -1,7 +1,7 @@
-## About AvMediaPlayer
+## About av_media_player
 
-A lightweight media player for flutter that builds on system or app level components. Video rendering in Texture widget.
-For api documentation please check [here](https://pub.dev/documentation/av_media_player/latest/index/index-library.html).
+A lightweight Flutter media player with subtitle rendering[^subtitle] and track selection, leveraging system components for seamless playback and video rendering via Flutter's `Texture` widget.
+For API documentation, please visit [here](https://pub.dev/documentation/av_media_player/latest/index/index-library.html).
 
 | **Platform** | **Version** | **Backend**                                                                           |
 | ------------ | ----------- | ------------------------------------------------------------------------------------- |
@@ -13,7 +13,7 @@ For api documentation please check [here](https://pub.dev/documentation/av_media
 
 ## Supported media formats
 
-The full list depends on the platform's native components. But the following formats are generally supported:
+The supported media formats vary by platform but generally include:
 
 | **Type**          | **Formats**               |
 | ----------------- | ------------------------- |
@@ -23,6 +23,7 @@ The full list depends on the platform's native components. But the following for
 | Subtitle Format   | WebVTT[^webvtt]           |
 | Transfer Protocol | HTTP, HLS, LL-HLS         |
 
-[^libmpv]: Linux backend requires `libmpv`(aka `mpv-libs`) to work. For developer who needs to integrate this plugin on linux, please install `libmpv-dev`(aka `mpv-libs-devel`) instead. If none of these packages are available in your package manager, you may need to build `libmpv` from source. For more information, please refer to [mpv-build](https://github.com/mpv-player/mpv-build).
-[^h265]: Windows user may need to install a free decoder for H.265(HEVC) from [Microsoft Store](https://apps.microsoft.com/detail/9n4wgh0z6vhq).
-[^webvtt]: WebVTT is supported on all platforms except Linux.
+[^subtitle]: Only internal subtitle tracks are supported. External subtitle files are not.
+[^libmpv]: The Linux backend requires `libmpv`(aka `mpv-libs`). Developers integrating this plugin into Linux app should install `libmpv-dev`(aka `mpv-libs-devel`) instead. If unavailable in your package manager, please build `libmpv` from source. For details, refer to [mpv-build](https://github.com/mpv-player/mpv-build).
+[^h265]: Windows user may need to install a free [H.265(HEVC) decoder](https://apps.microsoft.com/detail/9n4wgh0z6vhq) from Microsoft Store.
+[^webvtt]: WebVTT is supported on all platforms except Linux, where SRT and ASS formats are supported instead.

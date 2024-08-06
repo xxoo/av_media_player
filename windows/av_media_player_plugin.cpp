@@ -275,7 +275,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 		uint32_t maxBit = 0;
 		int16_t maxId = -1;
 		uint32_t minRes = UINT32_MAX;
-		uint32_t minBit = UINT16_MAX;
+		uint32_t minBit = UINT32_MAX;
 		int16_t minId = -1;
 		for (uint16_t i = 0; i < tracks.Size(); i++) {
 			auto props = tracks.GetAt(i).GetEncodingProperties();
@@ -694,7 +694,7 @@ public:
 				}
 			}));
 		});
-		 
+
 		mediaPlayer.MediaEnded([weakThis](auto, auto) {
 			dispatcherQueue.TryEnqueue(DispatcherQueueHandler([weakThis]() {
 				auto sharedThis = weakThis.lock();
@@ -715,7 +715,7 @@ public:
 			}));
 		});
 	}
- 
+
 	void open(const string& src) {
 		hstring url;
 		if (src._Starts_with("asset://")) {
