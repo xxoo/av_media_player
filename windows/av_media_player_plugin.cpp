@@ -272,7 +272,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	int16_t getDefaultVideoTrack() {
 		auto tracks = mediaPlayer.Source().as<MediaPlaybackItem>().VideoTracks();
 		uint32_t maxRes = 0;
-		uint32_t maxBit = 0
+		uint32_t maxBit = 0;
 		int16_t maxId = -1;
 		uint32_t minRes = UINT32_MAX;
 		uint32_t minBit = UINT16_MAX;
