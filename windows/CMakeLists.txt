@@ -22,6 +22,10 @@ add_library(${PLUGIN_NAME} SHARED
   "av_media_player_plugin.cpp"
 )
 
+if(MSVC)
+  target_compile_options(${PLUGIN_NAME} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR=1>")
+endif()
+
 # Apply a standard set of build settings that are configured in the
 # application-level CMakeLists.txt. This can be removed for plugins that want
 # full control over build settings.
