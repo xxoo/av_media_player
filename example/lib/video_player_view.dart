@@ -1,7 +1,9 @@
 // This example shows how to handle playback events and control the player.
 // Please note that the SetStateAsync mixin is necessary cause setState() may be called during build process.
-
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_subtitle/flutter_subtitle.dart';
 import 'package:av_media_player/index.dart';
 import 'sources.dart';
 
@@ -13,7 +15,9 @@ class VideoPlayerView extends StatefulWidget {
 }
 
 class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
-  final AvMediaPlayer _player = AvMediaPlayer(initSource: videoSources.first);
+  final _player = AvMediaPlayer(initSource: videoSources.first);
+  final _httpClient = HttpClient();
+  SubtitleController? _subtitleController;
 
   @override
   initState() {
@@ -71,6 +75,30 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Open Subtitle',
+                      hintText: 'Please input a subtitle URL',
+                    ),
+                    keyboardType: TextInputType.url,
+                    onSubmitted: (value) async {
+                      if (value.isNotEmpty && Uri.tryParse(value) != null) {
+                        final request =
+                            await _httpClient.getUrl(Uri.parse(value));
+                        final response = await request.close();
+                        final fileContents = await response
+                            .transform(const Utf8Decoder())
+                            .join();
+                        setState(() => _subtitleController =
+                            SubtitleController.string(fileContents,
+                                format: value.endsWith('.srt')
+                                    ? SubtitleFormat.srt
+                                    : SubtitleFormat.webvtt));
+                      } else {
+                        setState(() => _subtitleController = null);
+                      }
+                    },
+                  ),
                   AspectRatio(
                     aspectRatio: _player.videoSize.value == Size.zero
                         ? 16 / 9
@@ -92,6 +120,11 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
                               color: Colors.white,
                               fontSize: 24,
                             ),
+                          ),
+                        if (_subtitleController != null)
+                          SubtitleControllView(
+                            subtitleController: _subtitleController!,
+                            inMilliseconds: _player.position.value,
                           ),
                         if (_player.loading.value)
                           const CircularProgressIndicator(),

@@ -26,6 +26,7 @@ dependencies:
     path: ../
 
   inview_notifier_list: any
+  flutter_subtitle: any
 
 dev_dependencies:
   # The "flutter_lints" package below contains a set of recommended lints to
