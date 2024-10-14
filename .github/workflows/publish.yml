@@ -13,10 +13,16 @@ jobs:
       id-token: write # Required for authentication using OIDC
     runs-on: ubuntu-latest
     steps:
+      
       - uses: actions/checkout@v4
-      - uses: dart-lang/setup-dart@v1
-      - name: Install dependencies
-        run: dart pub get
-        
-      - name: Publish
-        run: dart pub publish --force
+        with:
+          repository: flutter/flutter
+          fetch-depth: 0
+          ref: stable
+          path: build
+
+      - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
+      
+      - run: build/bin/flutter pub get
+      
+      - run: build/bin/flutter pub publish -f
