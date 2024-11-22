@@ -9,22 +9,6 @@ on:
 
 jobs:
   publish:
-    #permissions:
-    #  id-token: write # Required for authentication using OIDC
-    runs-on: ubuntu-latest
-    steps:
-
-      - uses: actions/checkout@v4
-
-      - uses: actions/checkout@v4
-        with:
-          repository: flutter/flutter
-          fetch-depth: 0
-          ref: stable
-          path: build
-
-      - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
-
-      - run: build/bin/flutter pub get
-
-      - run: build/bin/flutter pub publish -f
+    permissions:
+      id-token: write # Required for authentication using OIDC
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
