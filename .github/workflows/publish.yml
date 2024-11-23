@@ -21,9 +21,15 @@ jobs:
           fetch-depth: 0
           ref: stable
           path: build
-      - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
-      - run: build/bin/flutter pub get
 
-      - uses: dart-lang/setup-dart@v1
-      #- run: dart pub get
-      - run: dart pub publish --force
+      - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
+
+      - run: build/bin/flutter pub get
+      
+      - shell: bash
+        env:
+          CREDENTIAL_JSON: ${{ secrets.CREDENTIAL_JSON }}
+        run: echo "$CREDENTIAL_JSON" > ~/.config/dart/pub-credentials.json
+
+      - run: build/bin/flutter pub publish -f
+     
