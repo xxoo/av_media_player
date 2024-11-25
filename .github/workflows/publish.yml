@@ -25,11 +25,13 @@ jobs:
       - run: sudo apt install -y curl git unzip xz-utils zip libglu1-mesa
 
       - run: build/bin/flutter pub get
+
+      - run: mkdir -p ~/.config/dart
       
       - shell: bash
         env:
           CREDENTIAL_JSON: ${{ secrets.CREDENTIAL_JSON }}
-        run: mkdir -p ~/.config/dart | echo "$CREDENTIAL_JSON" > ~/.config/dart/pub-credentials.json
+        run: echo "$CREDENTIAL_JSON" > ~/.config/dart/pub-credentials.json
 
       - run: build/bin/flutter pub publish -f
      
