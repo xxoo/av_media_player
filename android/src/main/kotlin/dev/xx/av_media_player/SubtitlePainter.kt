@@ -41,9 +41,12 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /** Paints subtitle {@link Cue}s. */
-@UnstableApi class SubtitlePainter(context: Context) {
+@UnstableApi
+class SubtitlePainter(context: Context) {
 
 	private val tag = "SubtitlePainter"
 
@@ -104,7 +107,8 @@ import androidx.media3.ui.SubtitleView
 
 		val resources = context.resources
 		val displayMetrics = resources.displayMetrics
-		val twoDpInPx = Math.round((2f * displayMetrics.densityDpi) / DisplayMetrics.DENSITY_DEFAULT).toFloat()
+		val twoDpInPx = ((2f * displayMetrics.densityDpi) / DisplayMetrics.DENSITY_DEFAULT).roundToInt()
+			.toFloat()
 		outlineWidth = twoDpInPx
 		shadowRadius = twoDpInPx
 		shadowOffset = twoDpInPx
@@ -152,7 +156,7 @@ import androidx.media3.ui.SubtitleView
 		val style = CaptionStyleCompat.DEFAULT
 		val bottomPaddingFraction = SubtitleView.DEFAULT_BOTTOM_PADDING_FRACTION
 		val cueBoxTop = 0
-		val cueBoxBottom = canvas.height - Math.round(canvas.height * bottomPaddingFraction)
+		val cueBoxBottom = canvas.height - (canvas.height * bottomPaddingFraction).roundToInt()
 		val cueBoxLeft = 0
 		val cueBoxRight = canvas.width
 		val defaultTextSizePx = SubtitleViewUtils.resolveTextSize(Cue.TEXT_SIZE_TYPE_FRACTIONAL, SubtitleView.DEFAULT_TEXT_SIZE_FRACTION, canvas.height, cueBoxBottom - cueBoxTop)
@@ -300,7 +304,7 @@ import androidx.media3.ui.SubtitleView
 		var textWidth = 0
 		val lineCount = textLayout.lineCount
 		for (i in 0 until lineCount) {
-			textWidth = Math.max(Math.ceil(textLayout.getLineWidth(i).toDouble()).toInt(), textWidth)
+			textWidth = ceil(textLayout.getLineWidth(i).toDouble()).toInt().coerceAtLeast(textWidth)
 		}
 		if (cueSize != Cue.DIMEN_UNSET && textWidth < availableWidth) {
 			textWidth = availableWidth
@@ -310,7 +314,7 @@ import androidx.media3.ui.SubtitleView
 		var textLeft: Int
 		var textRight: Int
 		if (cuePosition != Cue.DIMEN_UNSET) {
-			val anchorPosition = Math.round(parentWidth * cuePosition) + parentLeft
+			val anchorPosition = (parentWidth * cuePosition).roundToInt() + parentLeft
 			textLeft = when (cuePositionAnchor) {
 				Cue.ANCHOR_TYPE_END -> {
 					anchorPosition - textWidth
@@ -326,8 +330,8 @@ import androidx.media3.ui.SubtitleView
 				}
 			}
 
-			textLeft = Math.max(textLeft, parentLeft)
-			textRight = Math.min(textLeft + textWidth, parentRight)
+			textLeft = textLeft.coerceAtLeast(parentLeft)
+			textRight = (textLeft + textWidth).coerceAtMost(parentRight)
 		} else {
 			textLeft = (parentWidth - textWidth) / 2 + parentLeft
 			textRight = textLeft + textWidth
@@ -342,7 +346,7 @@ import androidx.media3.ui.SubtitleView
 		var textTop: Int
 		if (cueLine != Cue.DIMEN_UNSET) {
 			if (cueLineType == Cue.LINE_TYPE_FRACTION) {
-				val anchorPosition = Math.round(parentHeight * cueLine) + parentTop
+				val anchorPosition = (parentHeight * cueLine).roundToInt() + parentTop
 				textTop = when (cueLineAnchor) {
 					Cue.ANCHOR_TYPE_END -> anchorPosition - textHeight
 					Cue.ANCHOR_TYPE_MIDDLE -> (anchorPosition * 2 - textHeight) / 2
@@ -352,9 +356,9 @@ import androidx.media3.ui.SubtitleView
 				// cueLineType == Cue.LINE_TYPE_NUMBER
 				val firstLineHeight = textLayout.getLineBottom(0) - textLayout.getLineTop(0)
 				textTop = if (cueLine >= 0) {
-					Math.round(cueLine * firstLineHeight) + parentTop
+					(cueLine * firstLineHeight).roundToInt() + parentTop
 				} else {
-					Math.round((cueLine + 1) * firstLineHeight) + parentBottom - textHeight
+					((cueLine + 1) * firstLineHeight).roundToInt() + parentBottom - textHeight
 				}
 			}
 
@@ -390,26 +394,22 @@ import androidx.media3.ui.SubtitleView
 		val parentHeight = parentBottom - parentTop
 		val anchorX = parentLeft + (parentWidth * cuePosition)
 		val anchorY = parentTop + (parentHeight * cueLine)
-		val width = Math.round(parentWidth * cueSize)
+		val width = (parentWidth * cueSize).roundToInt()
 		val height = if (cueBitmapHeight != Cue.DIMEN_UNSET) {
-			Math.round(parentHeight * cueBitmapHeight)
+			(parentHeight * cueBitmapHeight).roundToInt()
 		} else {
-			Math.round(width * (cueBitmap.height.toFloat() / cueBitmap.width))
+			(width * (cueBitmap.height.toFloat() / cueBitmap.width)).roundToInt()
 		}
-		val x = Math.round(
-			when (cuePositionAnchor) {
-				Cue.ANCHOR_TYPE_END -> (anchorX - width)
-				Cue.ANCHOR_TYPE_MIDDLE -> (anchorX - (width / 2))
-				else -> anchorX
-			}
-		)
-		val y = Math.round(
-			when (cueLineAnchor) {
-				Cue.ANCHOR_TYPE_END -> (anchorY - height)
-				Cue.ANCHOR_TYPE_MIDDLE -> (anchorY - (height / 2))
-				else -> anchorY
-			}
-		)
+		val x = when (cuePositionAnchor) {
+			Cue.ANCHOR_TYPE_END -> (anchorX - width)
+			Cue.ANCHOR_TYPE_MIDDLE -> (anchorX - (width / 2))
+			else -> anchorX
+		}.roundToInt()
+		val y = when (cueLineAnchor) {
+			Cue.ANCHOR_TYPE_END -> (anchorY - height)
+			Cue.ANCHOR_TYPE_MIDDLE -> (anchorY - (height / 2))
+			else -> anchorY
+		}.roundToInt()
 		bitmapRect = Rect(x, y, x + width, y + height)
 	}
 
@@ -482,7 +482,8 @@ import androidx.media3.ui.SubtitleView
 }
 
 /** Utility class for subtitle layout logic. */
-@UnstableApi object SubtitleViewUtils {
+@UnstableApi
+object SubtitleViewUtils {
 
 	/**
 	 * Returns the text size in px, derived from [textSize] and [textSizeType].

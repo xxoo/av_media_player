@@ -27,6 +27,7 @@ using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
 
 class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	static ID3D11Device* d3dDevice;
+	static ID3D11DeviceContext* d3dContext;
 	static DispatcherQueueController dispatcherController;
 	static DispatcherQueue dispatcherQueue;
 
@@ -42,24 +43,19 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 		dispatcherQueue = dispatcherController.DispatcherQueue();
 	}
 
-	static vector<hstring> split(const hstring& input, wchar_t delimiter) {
+	static void split(const hstring& input, const wchar_t delimiter, vector<hstring>& tokens) {
 		wstring_view input_view{ input };
-		vector<hstring> tokens;
 		size_t start = 0;
 		size_t end = input_view.find(delimiter);
-
 		while (end != wstring_view::npos) {
-			tokens.push_back(hstring{ input_view.substr(start, end - start) });
+			tokens.push_back(hstring(input_view.substr(start, end - start)));
 			start = end + 1;
 			end = input_view.find(delimiter, start);
 		}
-
-		tokens.push_back(hstring{ input_view.substr(start) });
-
-		return tokens;
+		tokens.push_back(hstring(input_view.substr(start)));
 	}
 
-	static int16_t getBestMatch(map<uint16_t, vector<hstring>>& lang1, map<uint16_t, vector<hstring>>& lang2) {
+	static int16_t getBestMatch(const map<uint16_t, vector<hstring>>& lang1, const map<uint16_t, vector<hstring>>& lang2) {
 		if (lang2.size() == 1) {
 			return lang2.begin()->first;
 		} else if (lang2.size() > 1) {
@@ -89,7 +85,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 		}
 	}
 
-	static char* translateSubType(TimedMetadataKind kind) {
+	static char* translateSubType(const TimedMetadataKind kind) {
 		char* type = nullptr;
 		if (kind == TimedMetadataKind::Custom) {
 			type = "custom";
@@ -111,7 +107,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 		return type;
 	}
 
-	static TextureVariant* createTextureVariant(weak_ptr<AvMediaPlayer> weakThis, bool isSubtitle) {
+	static TextureVariant* createTextureVariant(weak_ptr<AvMediaPlayer> weakThis, const bool isSubtitle) {
 		return new TextureVariant(GpuSurfaceTexture(
 			kFlutterDesktopGpuSurfaceTypeDxgiSharedHandle,
 			//kFlutterDesktopGpuSurfaceTypeD3d11Texture2D,
@@ -130,12 +126,12 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 		));
 	}
 
-	static void renderCompleted(void* releaseContext) {
+	static void renderingCompleted(void* releaseContext) {
 		auto mtx = (mutex*)releaseContext;
 		mtx->unlock(); //this mutex is locked before we send the texture to flutter
 	}
 
-	static void drawFrame(weak_ptr<AvMediaPlayer> weakThis, bool isSubtitle) {
+	static void drawFrame(weak_ptr<AvMediaPlayer> weakThis, const bool isSubtitle) {
 		auto sharedThis = weakThis.lock();
 		if (sharedThis && (!isSubtitle || sharedThis->showSubtitle)) {
 			auto& buffer = isSubtitle ? sharedThis->subTextureBuffer : sharedThis->textureBuffer;
@@ -174,9 +170,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 						surface.Close();
 					}
 					check_hresult(CreateDirect3D11SurfaceFromDXGISurface(dxgiSurface.get(), reinterpret_cast<IInspectable**>(put_abi(surface))));
-				} if (isSubtitle) {
-					com_ptr<ID3D11DeviceContext> d3dContext;
-					d3dDevice->GetImmediateContext(d3dContext.put());
+				} else if (isSubtitle) {
 					const float clearColor[]{ 0.0f, 0.0f, 0.0f, 0.0f };
 					d3dContext->ClearRenderTargetView(sharedThis->subtitleRenderTargetView.get(), clearColor);
 				}
@@ -221,16 +215,18 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 	bool showSubtitle = false;
 	uint8_t state = 0; //0: idle, 1: opening, 2: ready, 3: playing
 
-	int16_t getDefaultAudioTrack(hstring lang) {
+	int16_t getDefaultAudioTrack(const hstring& lang) {
 		auto tracks = mediaPlayer.Source().as<MediaPlaybackItem>().AudioTracks();
 		if (tracks.Size() == 0) {
 			return -1;
 		} else {
-			auto toks = split(lang, L'-');
+			vector<hstring> toks;
+			split(lang, L'-', toks);
 			map<uint16_t, vector<hstring>> lang1;
 			map<uint16_t, vector<hstring>> lang2;
 			for (uint16_t i = 0; i < tracks.Size(); i++) {
-				auto t = split(tracks.GetAt(i).Language(), L'-');
+				vector<hstring> t;
+				split(tracks.GetAt(i).Language(), L'-', t);
 				if (t[0] == toks[0]) {
 					lang1[i] = t;
 					if (t.size() > 1 && toks.size() > 1 && t[1] == toks[1]) {
@@ -245,16 +241,18 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 		}
 	}
 
-	int16_t getDefaultSubtitleTrack(hstring lang) {
+	int16_t getDefaultSubtitleTrack(const hstring& lang) {
 		auto tracks = mediaPlayer.Source().as<MediaPlaybackItem>().TimedMetadataTracks();
-		auto toks = split(lang, L'-');
+		vector<hstring> toks;
+		split(lang, L'-', toks);
 		map<uint16_t, vector<hstring>> lang1;
 		map<uint16_t, vector<hstring>> lang2;
 		for (uint16_t i = 0; i < tracks.Size(); i++) {
 			auto track = tracks.GetAt(i);
 			auto kind = track.TimedMetadataKind();
 			if ((kind == TimedMetadataKind::Caption || kind == TimedMetadataKind::Subtitle || kind == TimedMetadataKind::ImageSubtitle) && track.Language() == lang) {
-				auto t = split(tracks.GetAt(i).Language(), L'-');
+				vector<hstring> t;
+				split(tracks.GetAt(i).Language(), L'-', t);
 				if (t[0] == toks[0]) {
 					lang1[i] = t;
 					if (t.size() > 1 && toks.size() > 1 && t[1] == toks[1]) {
@@ -316,7 +314,7 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 		}
 	}
 
-	int16_t getDefaultTrack(MediaTrackKind kind) {
+	int16_t getDefaultTrack(const MediaTrackKind kind) {
 		if (state > 1) {
 			if (kind == MediaTrackKind::Audio) {
 				if (preferredAudioLanguage.empty()) {
@@ -328,7 +326,8 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 						}
 					}
 				} else {
-					auto index = getDefaultAudioTrack(to_hstring(preferredAudioLanguage));
+					auto lang = to_hstring(preferredAudioLanguage);
+					auto index = getDefaultAudioTrack(lang);
 					if (index >= 0) {
 						return index;
 					}
@@ -343,7 +342,8 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 						}
 					}
 				} else {
-					auto index = getDefaultSubtitleTrack(to_hstring(preferredSubtitleLanguage));
+					auto lang = to_hstring(preferredSubtitleLanguage);
+					auto index = getDefaultSubtitleTrack(lang);
 					if (index >= 0) {
 						return index;
 					}
@@ -370,7 +370,6 @@ public:
 		} else {
 			createDispatcherQueue();
 		}
-		com_ptr<ID3D11DeviceContext> d3dContext;
 		D3D_FEATURE_LEVEL featureLevel{};
 		check_hresult(D3D11CreateDevice(
 			nullptr,
@@ -382,14 +381,14 @@ public:
 			D3D11_SDK_VERSION,
 			&d3dDevice,
 			&featureLevel,
-			d3dContext.put()
+			&d3dContext
 		));
 	}
 
 	static void uninitGlobal() {
 		if (d3dDevice) {
 			d3dDevice->Release();
-			d3dDevice = nullptr;
+			d3dContext->Release();
 		}
 		if (dispatcherController) {
 			dispatcherController.ShutdownQueueAsync();
@@ -405,7 +404,7 @@ public:
 	AvMediaPlayer() {
 		textureBuffer.struct_size = subTextureBuffer.struct_size = sizeof(FlutterDesktopGpuSurfaceDescriptor);
 		textureBuffer.format = subTextureBuffer.format = kFlutterDesktopPixelFormatBGRA8888;
-		textureBuffer.release_callback = subTextureBuffer.release_callback = renderCompleted;
+		textureBuffer.release_callback = subTextureBuffer.release_callback = renderingCompleted;
 		textureBuffer.release_context = &videoMutex;
 		subTextureBuffer.release_context = &subtitleMutex;
 		mediaPlayer.IsVideoFrameServerEnabled(true);
@@ -887,6 +886,7 @@ public:
 		}
 	}
 };
+ID3D11DeviceContext* AvMediaPlayer::d3dContext = nullptr;
 ID3D11Device* AvMediaPlayer::d3dDevice = nullptr;
 DispatcherQueueController AvMediaPlayer::dispatcherController{ nullptr };
 DispatcherQueue AvMediaPlayer::dispatcherQueue{ nullptr };

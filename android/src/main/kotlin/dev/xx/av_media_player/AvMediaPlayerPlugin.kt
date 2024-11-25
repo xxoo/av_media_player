@@ -11,15 +11,17 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import io.flutter.embedding.engine.plugins.FlutterPlugin
-import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.MethodChannel
+import kotlin.math.roundToInt
 
-@UnstableApi class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler, Player.Listener {
+@UnstableApi
+class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler, Player.Listener {
 	companion object {
 		private val trackTypes = mapOf(
 			C.TRACK_TYPE_VIDEO to "video",
@@ -70,9 +72,9 @@ import io.flutter.plugin.common.EventChannel
 		eventSink?.endOfStream()
 	}
 
-	fun open(source: String): Object? {
+	fun open(source: String): Any? {
 		close()
-		var url = ""
+		val url: String
 		if (source.startsWith("asset://")) {
 			url = "asset:///${binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8))}"
 		} else if (source.startsWith("file://") || !source.contains("://")) {
@@ -95,7 +97,7 @@ import io.flutter.plugin.common.EventChannel
 		return null
 	}
 
-	fun close(): Object? {
+	fun close(): Any? {
 		source = null
 		seeking = false
 		networking = false
@@ -112,7 +114,7 @@ import io.flutter.plugin.common.EventChannel
 		return null
 	}
 
-	fun play(): Object? {
+	fun play(): Any? {
 		if (state.compareTo(2U) == 0) {
 			state = 3U
 			justPlay()
@@ -126,7 +128,7 @@ import io.flutter.plugin.common.EventChannel
 		return null
 	}
 
-	fun pause(): Object? {
+	fun pause(): Any? {
 		if (state > 2U) {
 			state = 2U
 			exoPlayer.playWhenReady = false
@@ -134,7 +136,7 @@ import io.flutter.plugin.common.EventChannel
 		return null
 	}
 
-	fun seekTo(pos: Long): Object? {
+	fun seekTo(pos: Long): Any? {
 		if (exoPlayer.isCurrentMediaItemLive || exoPlayer.currentPosition == pos) {
 			eventSink?.success(mapOf("event" to "seekEnd"))
 		} else {
@@ -144,44 +146,44 @@ import io.flutter.plugin.common.EventChannel
 		return null
 	}
 
-	fun setVolume(vol: Float): Object? {
+	fun setVolume(vol: Float): Any? {
 		volume = vol
 		exoPlayer.volume = vol
 		return null
 	}
 
-	fun setSpeed(spd: Float): Object? {
+	fun setSpeed(spd: Float): Any? {
 		speed = spd
 		exoPlayer.playbackParameters = exoPlayer.playbackParameters.withSpeed(speed)
 		return null
 	}
 
-	fun setLooping(loop: Boolean): Object? {
+	fun setLooping(loop: Boolean): Any? {
 		looping = loop
 		return null
 	}
 
-	fun setMaxResolution(width: Int, height: Int): Object? {
+	fun setMaxResolution(width: Int, height: Int): Any? {
 		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setMaxVideoSize(width, height).build()
 		return null
 	}
 
-	fun setMaxBitrate(bitrate: Int): Object? {
+	fun setMaxBitrate(bitrate: Int): Any? {
 		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setMaxVideoBitrate(bitrate).build()
 		return null
 	}
 
-	fun setPreferredAudioLanguage(language: String): Object? {
-		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredAudioLanguage(if (language.isEmpty()) null else language).build()
+	fun setPreferredAudioLanguage(language: String): Any? {
+		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredAudioLanguage(language.ifEmpty { null }).build()
 		return null
 	}
 
-	fun setPreferredSubtitleLanguage(language: String): Object? {
-		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredTextLanguage(if (language.isEmpty()) null else language).build()
+	fun setPreferredSubtitleLanguage(language: String): Any? {
+		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredTextLanguage(language.ifEmpty { null }).build()
 		return null
 	}
 
-	fun setShowSubtitle(show: Boolean): Object? {
+	fun setShowSubtitle(show: Boolean): Any? {
 		showSubtitle = show
 		if (showSubtitle) {
 			clearSubtitle()
@@ -189,7 +191,7 @@ import io.flutter.plugin.common.EventChannel
 		return null
 	}
 
-	fun overrideTrack(groupId: Int, trackId: Int, enabled: Boolean): Object? {
+	fun overrideTrack(groupId: Int, trackId: Int, enabled: Boolean): Any? {
 		if (state > 1U) {
 			val group = exoPlayer.currentTracks.groups[groupId]
 			if (group != null && trackTypes.contains(group.type) && group.isTrackSupported(trackId, false)) {
@@ -382,11 +384,11 @@ import io.flutter.plugin.common.EventChannel
 			val width: Int
 			val height: Int
 			if (videoSize.unappliedRotationDegrees % 180 == 0) {
-				width = Math.round(videoSize.width * videoSize.pixelWidthHeightRatio)
+				width = (videoSize.width * videoSize.pixelWidthHeightRatio).roundToInt()
 				height = videoSize.height
 			} else {
 				width = videoSize.height
-				height = Math.round(videoSize.width * videoSize.pixelWidthHeightRatio)
+				height = (videoSize.width * videoSize.pixelWidthHeightRatio).roundToInt()
 			}
 			if (width > 0 && height > 0) {
 				subSurfaceTexture.setDefaultBufferSize(width, height)
@@ -420,7 +422,8 @@ import io.flutter.plugin.common.EventChannel
 	}
 }
 
-@UnstableApi class AvMediaPlayerPlugin: FlutterPlugin {
+@UnstableApi
+class AvMediaPlayerPlugin: FlutterPlugin {
 	private lateinit var methodChannel: MethodChannel
 	private val players = mutableMapOf<Int, AvMediaPlayer>()
 	private fun clear() {

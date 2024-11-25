@@ -111,7 +111,7 @@ static void av_media_player_close(AvMediaPlayer* self) {
 	self->overrideAudio = 0;
 	self->overrideSubtitle = 0;
 	if (self->source) {
-		free(self->source);
+		g_free(self->source);
 		self->source = NULL;
 	}
 	g_array_set_size(self->videoTracks, 0);
@@ -195,15 +195,15 @@ static void av_media_player_set_show_subtitle(AvMediaPlayer* self, const bool sh
 }
 
 static void av_media_player_set_preferred_audio_language(AvMediaPlayer* self, const gchar* language) {
-	mpv_set_property_string(self->mpv, "alang", (void*)language);
+	mpv_set_property_string(self->mpv, "alang", language);
 }
 
 static void av_media_player_set_preferred_subtitle_language(AvMediaPlayer* self, const gchar* language) {
-	mpv_set_property_string(self->mpv, "slang", (void*)language);
+	mpv_set_property_string(self->mpv, "slang", language);
 }
 
-static void av_media_player_set_max_bitrate(AvMediaPlayer* self, const uint32_t bitrate) {
-	mpv_set_property(self->mpv, "hls-bitrate", MPV_FORMAT_INT64, (void*)&bitrate);
+static void av_media_player_set_max_bitrate(AvMediaPlayer* self, uint32_t bitrate) {
+	mpv_set_property(self->mpv, "hls-bitrate", MPV_FORMAT_INT64, &bitrate);
 }
 
 static void av_media_player_set_max_resolution_real(AvMediaPlayer* self) {
@@ -514,7 +514,6 @@ static gboolean av_media_player_texture_populate(FlTextureGL* texture, uint32_t*
 }
 
 static void av_media_player_dispose(GObject* obj) {
-	G_OBJECT_CLASS(av_media_player_parent_class)->dispose(obj);
 	AvMediaPlayer* self = AV_MEDIA_PLAYER(obj);
 	g_idle_remove_by_data(self);
 	fl_event_channel_send_end_of_stream(self->eventChannel, NULL, NULL);
@@ -531,6 +530,7 @@ static void av_media_player_dispose(GObject* obj) {
 		glDeleteFramebuffers(1, (GLuint*)&self->fbo.fbo);
 		self->fbo.fbo = 0;
 	}
+	G_OBJECT_CLASS(av_media_player_parent_class)->dispose(obj);
 }
 
 static void av_media_player_class_init(AvMediaPlayerClass* klass) {

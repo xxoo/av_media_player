@@ -11,10 +11,9 @@ class TrackSelectorView extends StatefulWidget {
 
 class _TrackSelectorViewState extends State<TrackSelectorView>
     with SetStateAsync {
-  final AvMediaPlayer _player = AvMediaPlayer(
-    initSource:
-        'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
-  );
+  final _player = AvMediaPlayer(
+      initSource:
+          'https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8');
   final _videoTracks = <String>{};
   final _audioTracks = <String>{};
   final _subtitleTracks = <String>{};
@@ -75,7 +74,7 @@ class _TrackSelectorViewState extends State<TrackSelectorView>
                   TextField(
                     controller: _inputController,
                     decoration: const InputDecoration(
-                      labelText: 'Open URL',
+                      labelText: 'Open Media',
                       hintText: 'Please input a media URL',
                     ),
                     keyboardType: TextInputType.url,
