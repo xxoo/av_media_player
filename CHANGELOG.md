@@ -1,3 +1,6 @@
+## 1.1.3
+- restore example project
+
 ## 1.1.2
 - minor fixes and optimizations
 - support swift package manager on ios/macos
