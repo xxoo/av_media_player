@@ -79,7 +79,6 @@ static gboolean release_object_on_tree(gpointer key, gpointer value, gpointer ob
 }
 
 /* player implementation */
-
 static gboolean av_media_player_is_eof(AvMediaPlayer* self) {
 	gboolean eof;
 	mpv_get_property(self->mpv, "eof-reached", MPV_FORMAT_FLAG, &eof);
@@ -601,7 +600,6 @@ static AvMediaPlayer* av_media_player_new(FlMethodCodec* codec, FlBinaryMessenge
 }
 
 /* plugin implementation */
-
 static void av_media_player_plugin_clear(AvMediaPlayerPlugin* self) {
 	g_mutex_lock(&self->mutex);
 	g_tree_foreach(self->players, release_object_on_tree, NULL);
@@ -653,61 +651,61 @@ static void av_media_player_plugin_method_call(FlMethodChannel* channel, FlMetho
 			g_mutex_unlock(&self->mutex);
 		}
 	} else if (strcmp(method, "open") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const gchar* value = fl_value_get_string(fl_value_lookup_string(args, "value"));
-		av_media_player_open((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_open(player, value);
 	} else if (strcmp(method, "close") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(args);
-		av_media_player_close((AvMediaPlayer*)g_tree_lookup(self->players, id));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(args));
+		av_media_player_close(player);
 	} else if (strcmp(method, "play") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(args);
-		av_media_player_play((AvMediaPlayer*)g_tree_lookup(self->players, id));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(args));
+		av_media_player_play(player);
 	} else if (strcmp(method, "pause") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(args);
-		av_media_player_pause((AvMediaPlayer*)g_tree_lookup(self->players, id));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(args));
+		av_media_player_pause(player);
 	} else if (strcmp(method, "seekTo") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const int64_t value = fl_value_get_int(fl_value_lookup_string(args, "value"));
-		av_media_player_seek_to((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_seek_to(player, value);
 	} else if (strcmp(method, "setVolume") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const double value = fl_value_get_float(fl_value_lookup_string(args, "value"));
-		av_media_player_set_volume((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_set_volume(player, value);
 	} else if (strcmp(method, "setSpeed") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const double value = fl_value_get_float(fl_value_lookup_string(args, "value"));
-		av_media_player_set_speed((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_set_speed(player, value);
 	} else if (strcmp(method, "setLooping") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const bool value = fl_value_get_bool(fl_value_lookup_string(args, "value"));
-		av_media_player_set_looping((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_set_looping(player, value);
 	} else if (strcmp(method, "setShowSubtitle") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const bool value = fl_value_get_bool(fl_value_lookup_string(args, "value"));
-		av_media_player_set_show_subtitle((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_set_show_subtitle(player, value);
 	} else if (strcmp(method, "setPreferredAudioLanguage") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const gchar* value = fl_value_get_string(fl_value_lookup_string(args, "value"));
-		av_media_player_set_preferred_audio_language((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_set_preferred_audio_language(player, value);
 	} else if (strcmp(method, "setPreferredSubtitleLanguage") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const gchar* value = fl_value_get_string(fl_value_lookup_string(args, "value"));
-		av_media_player_set_preferred_subtitle_language((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_set_preferred_subtitle_language(player, value);
 	} else if (strcmp(method, "setMaxBitRate") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const uint32_t value = (uint32_t)fl_value_get_int(fl_value_lookup_string(args, "value"));
-		av_media_player_set_max_bitrate((AvMediaPlayer*)g_tree_lookup(self->players, id), value);
+		av_media_player_set_max_bitrate(player, value);
 	} else if (strcmp(method, "setMaxResolution") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const uint16_t width = (uint16_t)fl_value_get_float(fl_value_lookup_string(args, "width"));
 		const uint16_t height = (uint16_t)fl_value_get_float(fl_value_lookup_string(args, "height"));
-		av_media_player_set_max_resolution((AvMediaPlayer*)g_tree_lookup(self->players, id), width, height);
+		av_media_player_set_max_resolution(player, width, height);
 	} else if (strcmp(method, "overrideTrack") == 0) {
-		gpointer id = (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id"));
+		AvMediaPlayer* player = (AvMediaPlayer*)g_tree_lookup(self->players, (gpointer)fl_value_get_int(fl_value_lookup_string(args, "id")));
 		const uint8_t typeId = (uint8_t)fl_value_get_int(fl_value_lookup_string(args, "groupId"));
 		uint16_t trackId = (uint16_t)fl_value_get_int(fl_value_lookup_string(args, "trackId"));
 		const bool enabled = fl_value_get_bool(fl_value_lookup_string(args, "value"));
-		av_media_player_overrideTrack((AvMediaPlayer*)g_tree_lookup(self->players, id), typeId, trackId, enabled);
+		av_media_player_overrideTrack(player, typeId, trackId, enabled);
 	} else {
 		response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
 	}
@@ -719,7 +717,6 @@ static void av_media_player_plugin_method_call(FlMethodChannel* channel, FlMetho
 }
 
 /* plugin registration */
-
 void av_media_player_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
 	setlocale(LC_NUMERIC, "C");
 	plugin = AV_MEDIA_PLAYER_PLUGIN(g_object_new(av_media_player_plugin_get_type(), NULL));

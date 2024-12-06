@@ -578,10 +578,10 @@ public class AvMediaPlayerPlugin: NSObject, FlutterPlugin {
 			players[args["id"] as! Int64]?.seekTo(pos: CMTime(seconds: args["value"] as! Double / 1000, preferredTimescale: 1000))
 		case "setVolume":
 			let args = call.arguments as! [String: Any]
-			players[args["id"] as! Int64]?.setVolume(vol: args["value"] as! Float)
+			players[args["id"] as! Int64]?.setVolume(vol: Float(args["value"] as! Double))
 		case "setSpeed":
 			let args = call.arguments as! [String: Any]
-			players[args["id"] as! Int64]?.setSpeed(spd: args["value"] as! Float)
+			players[args["id"] as! Int64]?.setSpeed(spd: Float(args["value"] as! Double))
 		case "setLooping":
 			let args = call.arguments as! [String: Any]
 			players[args["id"] as! Int64]?.setLooping(loop: args["value"] as! Bool)

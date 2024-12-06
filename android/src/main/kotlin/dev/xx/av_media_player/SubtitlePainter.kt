@@ -38,9 +38,9 @@ import androidx.media3.common.text.Cue
 import androidx.media3.common.util.Assertions
 import androidx.media3.common.util.Log
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.common.util.Util
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
+import java.util.Objects
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
@@ -169,13 +169,13 @@ class SubtitlePainter(context: Context) {
 			windowColor = if (cue.windowColorSet) cue.windowColor else style.windowColor
 		}
 		if (areCharSequencesEqual(this.cueText, cue.text)
-			&& Util.areEqual(this.cueTextAlignment, cue.textAlignment)
+			&& Objects.equals(this.cueTextAlignment, cue.textAlignment)
 			&& this.cueBitmap == cue.bitmap
 			&& this.cueLine == cue.line
 			&& this.cueLineType == cue.lineType
-			&& Util.areEqual(this.cueLineAnchor, cue.lineAnchor)
+			&& Objects.equals(this.cueLineAnchor, cue.lineAnchor)
 			&& this.cuePosition == cue.position
-			&& Util.areEqual(this.cuePositionAnchor, cue.positionAnchor)
+			&& Objects.equals(this.cuePositionAnchor, cue.positionAnchor)
 			&& this.cueSize == cue.size
 			&& this.cueBitmapHeight == cue.bitmapHeight
 			&& this.foregroundColor == style.foregroundColor
@@ -183,7 +183,7 @@ class SubtitlePainter(context: Context) {
 			&& this.windowColor == windowColor
 			&& this.edgeType == style.edgeType
 			&& this.edgeColor == style.edgeColor
-			&& Util.areEqual(this.textPaint.typeface, style.typeface)
+			&& Objects.equals(this.textPaint.typeface, style.typeface)
 			&& this.defaultTextSizePx == defaultTextSizePx
 			&& this.cueTextSizePx == cueTextSizePx
 			&& this.bottomPaddingFraction == bottomPaddingFraction

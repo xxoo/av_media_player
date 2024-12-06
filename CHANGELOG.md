@@ -1,3 +1,6 @@
+## 1.1.4
+- fixed a bug on ios/macos that can lead to crash while setting the volume and speed.
+
 ## 1.1.3
 - restore example project
 
