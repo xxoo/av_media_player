@@ -17,16 +17,18 @@ class VideoListView extends StatefulWidget {
 class _VideoListView extends State<VideoListView> with SetStateAsync {
   final _players = <AvMediaPlayer>[];
 
+  void _update() => setState(() {});
+
   @override
   void initState() {
     super.initState();
     for (var i = 0; i < videoSources.length; i++) {
       final player = AvMediaPlayer(initLooping: true);
       // Listening to mediaInfo is optional in this case.
-      // As loading always become false when mediaInfo is perpared.
+      // As loading always becomes false when mediaInfo is perpared.
       // player.mediaInfo.addListener(() => setState(() {}));
-      player.loading.addListener(() => setState(() {}));
-      player.videoSize.addListener(() => setState(() {}));
+      player.loading.addListener(_update);
+      player.videoSize.addListener(_update);
       _players.add(player);
     }
   }
@@ -44,10 +46,9 @@ class _VideoListView extends State<VideoListView> with SetStateAsync {
   Widget build(BuildContext context) => InViewNotifierList(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 200),
         isInViewPortCondition:
-            (double deltaTop, double deltaBottom, double viewPortDimension) {
-          return deltaTop < (0.5 * viewPortDimension) &&
-              deltaBottom > (0.5 * viewPortDimension);
-        },
+            (double deltaTop, double deltaBottom, double viewPortDimension) =>
+                deltaTop < (0.5 * viewPortDimension) &&
+                deltaBottom > (0.5 * viewPortDimension),
         builder: (context, index) => InViewNotifierWidget(
           id: '$index',
           child: Container(

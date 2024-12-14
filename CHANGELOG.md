@@ -1,3 +1,7 @@
+## 1.2.0
+- support Impeller renderer on android.
+- requires flutter 3.27.0 or higher.
+
 ## 1.1.4
 - fixed a bug on ios/macos that can lead to crash while setting the volume and speed.
 

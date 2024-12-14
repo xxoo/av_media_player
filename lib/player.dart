@@ -3,10 +3,10 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// This type is used by [AvMediaPlayer], for showing current playback state.
+/// This type is used by [AvMediaPlayer] to show the current playback state.
 enum PlaybackState { playing, paused, closed }
 
-/// This type is used by [AvMediaPlayer], for showing current buffer status.
+/// This type is used by [AvMediaPlayer] to show the current buffer status.
 class BufferRange {
   static const empty = BufferRange(0, 0);
 
@@ -15,11 +15,11 @@ class BufferRange {
   const BufferRange(this.begin, this.end);
 }
 
-/// This type is used by [TrackInfo], for showing the type of the track.
+/// This type is used by [TrackInfo] to show the type of the track.
 enum TrackType { audio, video, subtitle }
 
-/// This type is used by [MediaInfo], for showing information about a track.
-/// Only [type] is guaranteed to be non-null. Other information may not be available. And can be different on different platforms.
+/// This type is used by [MediaInfo] to show information about a track.
+/// Only [type] is guaranteed to be non-null. Other information may not be available and can be different on different platforms.
 class TrackInfo {
   static TrackInfo fromMap(Map map) {
     final type = map['type'] as String;
@@ -79,8 +79,8 @@ class TrackInfo {
   });
 }
 
-/// This type is used by [AvMediaPlayer], for showing current media info.
-/// If duration is 0, it means the media is a realtime stream
+/// This type is used by [AvMediaPlayer] to show current media info.
+/// [duration] == 0 means the media is a realtime stream.
 /// [tracks] contains all the tracks of the media. The key is the track id. However, video tracks may not available on ios/macos/windows.
 class MediaInfo {
   final int duration;
@@ -103,8 +103,8 @@ class AvMediaPlayer {
   /// This value does not change after the player is initialized.
   int? subId;
 
-  /// The id of the player. It's null before the player is initialized.
-  /// After the player is initialized it will be unique and never change again.
+  /// The id of the player.
+  /// It should be unique and never change again after the player is initialized, or null otherwise.
   final id = ValueNotifier<int?>(null);
 
   /// The information of the current media.
@@ -171,17 +171,17 @@ class AvMediaPlayer {
   final preferredSubtitleLanguage = ValueNotifier<String>('');
 
   /// Whether to show subtitles.
-  /// By default, the player does not show any subtitles. Regardless of the preferred subtitle language or override tracks.
+  /// By default, the player does not show any subtitle. Regardless of the preferred subtitle language or override tracks.
   final showSubtitle = ValueNotifier(false);
 
   // Event channel is much more efficient than method channel
-  // We'd better use it to hanel playback events especially for position
+  // We'd better use it to handle playback events especially for position
   StreamSubscription? _eventSubscription;
   String? _source;
   int? _position;
   var _seeking = false;
 
-  /// All the parameters are optional, and can be changed later by calling the corresponding methods.
+  /// All parameters are optional, and can be changed later by calling the corresponding methods.
   AvMediaPlayer({
     String? initSource,
     double? initVolume,
@@ -268,7 +268,7 @@ class AvMediaPlayer {
                   : BufferRange(begin, end);
             }
           } else if (e['event'] == 'error') {
-            //ignore errors when player is closed
+            // ignore errors when player is closed
             if (playbackState.value != PlaybackState.closed || loading.value) {
               _source = null;
               error.value = e['value'];
@@ -358,7 +358,7 @@ class AvMediaPlayer {
     }
   }
 
-  /// Dispose the player
+  /// Dispose the player.
   void dispose() {
     if (!disposed) {
       disposed = true;
@@ -388,9 +388,9 @@ class AvMediaPlayer {
     }
   }
 
-  /// Open a media file
+  /// Open a media file.
   ///
-  /// source: The url or local path of the media file
+  /// [source] is the url or local path of the media file
   void open(String source) {
     if (!disposed) {
       _source = source;
@@ -419,9 +419,9 @@ class AvMediaPlayer {
     }
   }
 
-  /// Play the current media file.
+  /// Play the current media.
   ///
-  /// If the the player is opening a media file, calling this method will set autoplay to true
+  /// If the the player is opening a media file, calling this method will set autoplay to true.
   bool play() {
     if (!disposed) {
       if (id.value != null && playbackState.value == PlaybackState.paused) {
@@ -440,7 +440,7 @@ class AvMediaPlayer {
 
   /// Pause the current media file.
   ///
-  /// If the the player is opening a media file, calling this method will set autoplay to false
+  /// If the the player is opening a media file, calling this method will set autoplay to false.
   bool pause() {
     if (!disposed) {
       if (id.value != null && playbackState.value == PlaybackState.playing) {
@@ -462,7 +462,7 @@ class AvMediaPlayer {
 
   /// Seek to a specific position.
   ///
-  /// position: The position to seek to in milliseconds.
+  /// [position] is the position to seek to in milliseconds.
   bool seekTo(int position) {
     if (!disposed && id.value != null) {
       if (mediaInfo.value == null) {
@@ -490,7 +490,7 @@ class AvMediaPlayer {
 
   /// Set the volume of the player.
   ///
-  /// volume: The volume to set between 0 and 1.
+  /// [volume] is the volume to set between 0 and 1.
   bool setVolume(double volume) {
     if (!disposed) {
       if (volume < 0) {
@@ -509,7 +509,7 @@ class AvMediaPlayer {
 
   /// Set playback speed of the player.
   ///
-  /// speed: The speed to set between 0.5 and 2.
+  /// [speed] is the speed to set between 0.5 and 2.
   bool setSpeed(double speed) {
     if (!disposed) {
       if (speed < 0.5) {
@@ -618,7 +618,7 @@ class AvMediaPlayer {
   }
 
   /// Force the player to override a track. Or cancel the override.
-  /// The [trackId] is a key of [MediaInfo.tracks].
+  /// [trackId] should be a key of [MediaInfo.tracks].
   bool overrideTrack(String trackId, bool enabled) {
     if (!disposed &&
         mediaInfo.value != null &&

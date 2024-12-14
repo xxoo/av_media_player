@@ -19,14 +19,17 @@ class _TrackSelectorViewState extends State<TrackSelectorView>
   final _subtitleTracks = <String>{};
   final _inputController = TextEditingController();
 
+  void _update() => setState(() {});
+
   @override
   initState() {
     super.initState();
-    _player.showSubtitle.addListener(() => setState(() {}));
-    _player.playbackState.addListener(() => setState(() {}));
-    _player.position.addListener(() => setState(() {}));
-    _player.error.addListener(() => setState(() {}));
-    _player.overrideTracks.addListener(() => setState(() {}));
+    _player.showSubtitle.addListener(_update);
+    _player.playbackState.addListener(_update);
+    _player.position.addListener(_update);
+    _player.overrideTracks.addListener(_update);
+    _player.videoSize.addListener(_update);
+    _player.loading.addListener(_update);
     _player.mediaInfo.addListener(() => setState(() {
           _videoTracks.clear();
           _audioTracks.clear();
@@ -44,8 +47,11 @@ class _TrackSelectorViewState extends State<TrackSelectorView>
             });
           }
         }));
-    _player.videoSize.addListener(() => setState(() {}));
-    _player.loading.addListener(() => setState(() {}));
+    _player.error.addListener(() {
+      if (_player.error.value != null) {
+        debugPrint('Error: ${_player.error.value}');
+      }
+    });
     _player.bufferRange.addListener(() {
       if (_player.bufferRange.value != BufferRange.empty) {
         debugPrint(

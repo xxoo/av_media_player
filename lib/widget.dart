@@ -62,6 +62,8 @@ class _AVMediaState extends State<AvMediaView> with SetStateAsync {
   bool _foreignPlayer = false;
   AvMediaPlayer? _player;
 
+  void _update() => setState(() {});
+
   @override
   void initState() {
     super.initState();
@@ -175,6 +177,4 @@ class _AVMediaState extends State<AvMediaView> with SetStateAsync {
       return Container(color: widget.backgroundColor);
     }
   }
-
-  void _update() => setState(() {});
 }

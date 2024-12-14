@@ -19,19 +19,25 @@ class _VideoPlayerViewState extends State<VideoPlayerView> with SetStateAsync {
   final _httpClient = HttpClient();
   SubtitleController? _subtitleController;
 
+  void _update() => setState(() {});
+
   @override
   initState() {
     super.initState();
-    _player.playbackState.addListener(() => setState(() {}));
-    _player.position.addListener(() => setState(() {}));
-    _player.error.addListener(() => setState(() {}));
-    _player.speed.addListener(() => setState(() {}));
-    _player.volume.addListener(() => setState(() {}));
-    _player.mediaInfo.addListener(() => setState(() {}));
-    _player.videoSize.addListener(() => setState(() {}));
-    _player.loading.addListener(() => setState(() {}));
-    _player.looping.addListener(() => setState(() {}));
-    _player.autoPlay.addListener(() => setState(() {}));
+    _player.playbackState.addListener(_update);
+    _player.position.addListener(_update);
+    _player.speed.addListener(_update);
+    _player.volume.addListener(_update);
+    _player.mediaInfo.addListener(_update);
+    _player.videoSize.addListener(_update);
+    _player.loading.addListener(_update);
+    _player.looping.addListener(_update);
+    _player.autoPlay.addListener(_update);
+    _player.error.addListener(() {
+      if (_player.error.value != null) {
+        debugPrint('Error: ${_player.error.value}');
+      }
+    });
     _player.bufferRange.addListener(() {
       if (_player.bufferRange.value != BufferRange.empty) {
         debugPrint(
