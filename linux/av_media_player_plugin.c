@@ -37,11 +37,18 @@ typedef struct {
 	bool streaming;
 	bool networking;
 	uint8_t state; // 0: idle, 1: opening, 2: paused, 3: playing
+	bool disposed;
 } AvMediaPlayer;
 typedef struct {
 	FlTextureGLClass parent_class;
 } AvMediaPlayerClass;
 G_DEFINE_TYPE(AvMediaPlayer, av_media_player, fl_texture_gl_get_type())
+
+typedef struct {
+	uint16_t track_id;
+	uint16_t width;
+	uint16_t height;
+} TrackInfo;
 
 /* plugin class */
 #define AV_MEDIA_PLAYER_PLUGIN(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), av_media_player_plugin_get_type(), AvMediaPlayerPlugin))
@@ -62,8 +69,8 @@ G_DEFINE_TYPE(AvMediaPlayerPlugin, av_media_player_plugin, g_object_get_type())
 static AvMediaPlayerPlugin* plugin;
 
 static gint compare_key(gconstpointer a, gconstpointer b) {
-	int64_t i = (int64_t)a;
-	int64_t j = (int64_t)b;
+	gint64 i = (gint64)GPOINTER_TO_INT(a);
+	gint64 j = (gint64)GPOINTER_TO_INT(b);
 	if (i > j) {
 		return 1;
 	} else if (i < j) {
@@ -213,17 +220,25 @@ static void av_media_player_set_max_resolution_real(AvMediaPlayer* self) {
 			uint16_t minId = 0;
 			uint32_t minRes = UINT32_MAX;
 			for (uint i = 0; i < self->videoTracks->len; i++) {
-				uint16_t* data = &g_array_index(self->videoTracks, uint16_t, i * 3);
-				uint32_t res = data[1] * data[2];
-				if ((self->maxWidth == 0 || data[1] <= self->maxWidth) && (self->maxHeight == 0 || data[2] <= self->maxHeight) && res > maxRes) {
-					id = data[0];
+				TrackInfo* info = &g_array_index(self->videoTracks, TrackInfo, i);
+				uint16_t trackId = info->track_id;
+				uint16_t w = info->width;
+				uint16_t h = info->height;
+				uint32_t res = w * h;
+
+				if ((self->maxWidth == 0 || w <= self->maxWidth) &&
+					(self->maxHeight == 0 || h <= self->maxHeight) &&
+					res > maxRes) {
+					id = trackId;
 					maxRes = res;
-				}
+					}
+
 				if (id == 0 && res < minRes) {
-					minId = data[0];
+					minId = trackId;
 					minRes = res;
 				}
 			}
+
 			if (id == 0) {
 				id = minId;
 			}
@@ -279,8 +294,14 @@ static void* gl_init(void* data, const char* name) {
 	}
 }
 
-static void event_callback(void* id) {
+static int event_callback(void* id) {
+	g_mutex_lock(&plugin->mutex);
 	AvMediaPlayer* self = g_tree_lookup(plugin->players, id);
+	g_mutex_unlock(&plugin->mutex);
+	if (!self || self->disposed) {
+		return G_SOURCE_REMOVE;
+	}
+
 	while (self) {
 		mpv_event* event = mpv_wait_event(self->mpv, 0);
 		if (event->event_id == MPV_EVENT_NONE) {
@@ -395,18 +416,26 @@ static void event_callback(void* id) {
 							}
 						}
 						if (type == 0) {
-							uint16_t data[] = { (uint16_t)trackId, 0, 0 };
+							TrackInfo data;
+							data.track_id = (uint16_t)trackId;
+							data.width = 0;
+							data.height = 0;
+
 							sprintf(p, "track-list/%d/demux-w", i);
 							if (!mpv_get_property(self->mpv, p, MPV_FORMAT_INT64, &size)) {
 								fl_value_set_string_take(info, "width", fl_value_new_int(size));
-								data[1] = (uint16_t)size;
+								data.width = (uint16_t)size;
 							}
+
 							sprintf(p, "track-list/%d/demux-h", i);
 							if (!mpv_get_property(self->mpv, p, MPV_FORMAT_INT64, &size)) {
 								fl_value_set_string_take(info, "height", fl_value_new_int(size));
-								data[2] = (uint16_t)size;
+								data.height = (uint16_t)size;
 							}
+
+							// Now append the fully populated struct to the GArray
 							g_array_append_val(self->videoTracks, data);
+
 							double fps;
 							sprintf(p, "track-list/%d/demux-fps", i);
 							if (!mpv_get_property(self->mpv, p, MPV_FORMAT_DOUBLE, &fps)) {
@@ -461,19 +490,23 @@ static void event_callback(void* id) {
 			}
 		}
 	}
+	return G_SOURCE_REMOVE;
 }
 
 static void wakeup_callback(void* id) {
-	g_idle_add_once(event_callback, id);
+	// g_idle_add_once(event_callback, id);
+	g_timeout_add(0, event_callback, id);
 }
 
 static void texture_update_callback(void* id) {
 	g_mutex_lock(&plugin->mutex);
 	AvMediaPlayer* self = g_tree_lookup(plugin->players, id);
-	g_mutex_unlock(&plugin->mutex);
-	if (self) {
-		fl_texture_registrar_mark_texture_frame_available(self->textureRegistrar, FL_TEXTURE(self));
+	if (!self || self->disposed) {
+		g_mutex_unlock(&plugin->mutex);
+		return;
 	}
+	fl_texture_registrar_mark_texture_frame_available(self->textureRegistrar, FL_TEXTURE(self));
+	g_mutex_unlock(&plugin->mutex);
 }
 
 static gboolean av_media_player_texture_populate(FlTextureGL* texture, uint32_t* target, uint32_t* name, uint32_t* width, uint32_t* height, GError** error) {
@@ -514,6 +547,7 @@ static gboolean av_media_player_texture_populate(FlTextureGL* texture, uint32_t*
 
 static void av_media_player_dispose(GObject* obj) {
 	AvMediaPlayer* self = AV_MEDIA_PLAYER(obj);
+	self->disposed = true;
 	g_idle_remove_by_data(self);
 	fl_event_channel_send_end_of_stream(self->eventChannel, NULL, NULL);
 	mpv_render_context_free(self->mpvRenderContext);
@@ -554,7 +588,7 @@ static void av_media_player_init(AvMediaPlayer* self) {
 	self->streaming = false;
 	self->networking = false;
 	self->mpv = mpv_create();
-	self->videoTracks = g_array_new(FALSE, FALSE, sizeof(uint16_t) * 3);
+	self->videoTracks = g_array_new(FALSE, FALSE, sizeof(TrackInfo));
 	av_media_player_set_volume(self, 1);
 	//mpv_set_option_string(self->mpv, "terminal", "yes");
 	//mpv_set_option_string(self->mpv, "msg-level", "all=v");
@@ -635,7 +669,7 @@ static void av_media_player_plugin_method_call(FlMethodChannel* channel, FlMetho
 	if (strcmp(method, "create") == 0) {
 		AvMediaPlayer* player = av_media_player_new(self->codec, self->messenger, self->textureRegistrar);
 		g_mutex_lock(&self->mutex);
-		g_tree_insert(self->players, (gpointer)player->id, player);
+		g_tree_insert(self->players, GINT_TO_POINTER((gint)player->id), player);
 		g_mutex_unlock(&self->mutex);
 		g_autoptr(FlValue) result = fl_value_new_map();
 		fl_value_set_string_take(result, "id", fl_value_new_int(player->id));
