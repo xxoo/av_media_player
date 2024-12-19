@@ -38,7 +38,8 @@ class AvMediaPlayer : public enable_shared_from_this<AvMediaPlayer> {
 				DQTYPE_THREAD_CURRENT,
 				DQTAT_COM_NONE
 			},
-			reinterpret_cast<ABI::Windows::System::IDispatcherQueueController**>(winrt::put_abi(dispatcherController))
+			//PDISPATCHERQUEUECONTROLLER could be missing in some case, so we use the original type instead
+			reinterpret_cast<ABI::Windows::System::IDispatcherQueueController**>(put_abi(dispatcherController))
 		));
 		dispatcherQueue = dispatcherController.DispatcherQueue();
 	}

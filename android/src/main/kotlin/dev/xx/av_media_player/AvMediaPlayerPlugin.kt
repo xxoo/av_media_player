@@ -1,45 +1,27 @@
 package dev.xx.av_media_player
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
-import android.graphics.SurfaceTexture
-import android.media.MediaFormat
-import android.opengl.EGL14
-import android.opengl.EGLConfig
-import android.opengl.EGLContext
-import android.opengl.EGLDisplay
-import android.opengl.EGLSurface
-import android.opengl.GLES11Ext
-import android.opengl.GLES20
 import android.os.Handler
-import android.os.Looper
-import android.view.PixelCopy
 import android.view.Surface
 import androidx.media3.common.C
 import androidx.media3.common.ColorInfo
-import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.VideoSize
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.view.TextureRegistry.SurfaceProducer
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.roundToInt
 
 @UnstableApi
-class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler, Player.Listener, VideoFrameMetadataListener, SurfaceProducer.Callback {
+class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : EventChannel.StreamHandler, Player.Listener {
 	companion object {
 		private val trackTypes = mapOf(
 			C.TRACK_TYPE_VIDEO to "video",
@@ -47,23 +29,18 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			C.TRACK_TYPE_TEXT to "sub"
 		)
 	}
-	private val surfaceProducer = binding.textureRegistry.createSurfaceProducer()
-	val id = surfaceProducer.id().toInt()
+	private val surfaceEntry = binding.textureRegistry.createSurfaceTexture()
+	private val subSurfaceEntry = binding.textureRegistry.createSurfaceTexture()
+	val id = surfaceEntry.id().toInt()
+	val subId = subSurfaceEntry.id().toInt()
+	private val surface = Surface(surfaceEntry.surfaceTexture())
+	private val subSurfaceTexture = subSurfaceEntry.surfaceTexture()
+	private val subSurface = Surface(subSurfaceTexture)
 	private val exoPlayer = ExoPlayer.Builder(binding.applicationContext).build()
 	private val handler = Handler(exoPlayer.applicationLooper)
-	private val glHandler = Handler(exoPlayer.playbackLooper)
 	private val eventChannel = EventChannel(binding.binaryMessenger, "av_media_player/$id")
 	private val subtitlePainter = SubtitlePainter(binding.applicationContext)
-	private val paint = Paint()
-	private val copying = AtomicInteger(0) // 0: no, 1: copying, 2: need recycle
 
-	private var videoFrame: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-	private var subTitleFrame: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-	private var eglSurface: EGLSurface? = null
-	private var eglDisplay: EGLDisplay? = null
-	private var eglContext: EGLContext? = null
-	private var surfaceTexture: SurfaceTexture? = null
-	private var surface: Surface? = null
 	private var speed = 1F
 	private var volume = 1F
 	private var looping = false
@@ -72,95 +49,32 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	private var watching = false
 	private var buffering = false
 	private var bufferPosition = 0L
-	private var state: UByte = 0U // 0: idle, 1: opening, 2: ready, 3: playing
+	private var state: UByte = 0U //0: idle, 1: opening, 2: ready, 3: playing
 	private var source: String? = null
 	private var seeking = false
 	private var networking = false
 	private var showSubtitle = false
-	private var hidden = false
-	private var width = 0
-	private var height = 0
 
 	init {
 		binding.textureRegistry.createSurfaceProducer()
 		eventChannel.setStreamHandler(this)
 		exoPlayer.addListener(this)
-		exoPlayer.setVideoFrameMetadataListener(this)
-		paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_OVER)
-		surfaceProducer.setCallback(this)
-		// the flutter team refused to provide notification before the surface is destroyed
-		// so we have to use a workaround to proxy the surface texture
-		// which may increase memory usage and decrease rendering performance
-		// https://github.com/flutter/flutter/issues/152839
-		glHandler.post {
-			eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
-			val version = IntArray(2)
-			EGL14.eglInitialize(eglDisplay, version, 0, version, 1)
-			val configs = arrayOfNulls<EGLConfig>(1)
-			val numConfigs = IntArray(1)
-			EGL14.eglChooseConfig(eglDisplay, intArrayOf(
-				EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-				EGL14.EGL_RED_SIZE, 8,
-				EGL14.EGL_GREEN_SIZE, 8,
-				EGL14.EGL_BLUE_SIZE, 8,
-				EGL14.EGL_ALPHA_SIZE, 8,
-				EGL14.EGL_DEPTH_SIZE, 16,
-				EGL14.EGL_STENCIL_SIZE, 8,
-				EGL14.EGL_NONE
-			), 0, configs, 0, configs.size, numConfigs, 0)
-			eglContext = EGL14.eglCreateContext(eglDisplay, configs[0], EGL14.EGL_NO_CONTEXT, intArrayOf(
-				EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
-				EGL14.EGL_NONE
-			), 0)
-			eglSurface = EGL14.eglCreatePbufferSurface(eglDisplay, configs[0], intArrayOf(
-				EGL14.EGL_NONE
-			), 0)
-			EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
-			val textures = IntArray(1)
-			GLES20.glGenTextures(1, textures, 0)
-			GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textures[0])
-			surfaceTexture = SurfaceTexture(textures[0])
-			surface = Surface(surfaceTexture)
-			handler.post {
-				exoPlayer.setVideoSurface(surface)
-			}
-			surfaceTexture!!.setOnFrameAvailableListener {
-				surfaceTexture!!.updateTexImage()
-				if (state > 0U && copying.compareAndSet(0, 1)) { // skip frame if copying
-					val old = videoFrame
-					PixelCopy.request(surface!!, old, { copyResult ->
-						if (copyResult == PixelCopy.SUCCESS && state > 0u && !hidden) {
-							render(old)
-						}
-						if (copying.getAndSet(0) == 2) { // check if just skipped recycle
-							old.recycle()
-						}
-					}, glHandler)
-				}
-			}
-		}
+		exoPlayer.setVideoSurface(surface)
 	}
 
 	fun dispose() {
 		handler.removeCallbacksAndMessages(null)
-		if (eglDisplay != null) {
-			glHandler.post {
-				EGL14.eglDestroySurface(eglDisplay, eglSurface)
-				EGL14.eglDestroyContext(eglDisplay, eglContext)
-				EGL14.eglTerminate(eglDisplay)
-			}
-		}
 		exoPlayer.release()
-		videoFrame.recycle()
-		subTitleFrame.recycle()
-		surface?.release()
-		surfaceTexture?.release()
+		surface.release()
+		subSurface.release()
+		surfaceEntry.release()
+		subSurfaceEntry.release()
 		eventSink?.endOfStream()
 	}
 
 	fun open(source: String): Any? {
 		close()
-		var url = ""
+		val url: String
 		if (source.startsWith("asset://")) {
 			url = "asset:///${binding.flutterAssets.getAssetFilePathBySubpath(source.substring(8))}"
 		} else if (source.startsWith("file://") || !source.contains("://")) {
@@ -175,7 +89,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			state = 1U
 			this.source = source
 		} catch (e: Exception) {
-			sendEvent(mapOf(
+			eventSink?.success(mapOf(
 				"event" to "error",
 				"value" to e.toString()
 			))
@@ -190,12 +104,10 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 		state = 0U
 		position = 0
 		bufferPosition = 0
-		width = 0
-		height = 0
 		exoPlayer.playWhenReady = false
 		exoPlayer.stop()
 		exoPlayer.clearMediaItems()
-		Canvas(subTitleFrame).drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+		clearSubtitle()
 		if (exoPlayer.trackSelectionParameters.overrides.isNotEmpty()) {
 			exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().clearOverrides().build()
 		}
@@ -207,7 +119,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			state = 3U
 			justPlay()
 			if (exoPlayer.playbackState == Player.STATE_BUFFERING) {
-				sendEvent(mapOf(
+				eventSink?.success(mapOf(
 					"event" to "loading",
 					"value" to true
 				))
@@ -226,7 +138,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 
 	fun seekTo(pos: Long): Any? {
 		if (exoPlayer.isCurrentMediaItemLive || exoPlayer.currentPosition == pos) {
-			sendEvent(mapOf("event" to "seekEnd"))
+			eventSink?.success(mapOf("event" to "seekEnd"))
 		} else {
 			seeking = true
 			exoPlayer.seekTo(pos)
@@ -262,19 +174,19 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 	}
 
 	fun setPreferredAudioLanguage(language: String): Any? {
-		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredAudioLanguage(if (language.isEmpty()) null else language).build()
+		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredAudioLanguage(language.ifEmpty { null }).build()
 		return null
 	}
 
 	fun setPreferredSubtitleLanguage(language: String): Any? {
-		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredTextLanguage(if (language.isEmpty()) null else language).build()
+		exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters.buildUpon().setPreferredTextLanguage(language.ifEmpty { null }).build()
 		return null
 	}
 
 	fun setShowSubtitle(show: Boolean): Any? {
 		showSubtitle = show
-		if (copying.get() == 0 && state.compareTo(2U) == 0 && !hidden && width > 0 && height > 0) {
-			render(videoFrame)
+		if (showSubtitle) {
+			clearSubtitle()
 		}
 		return null
 	}
@@ -291,6 +203,12 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 			}
 		}
 		return null
+	}
+
+	private fun clearSubtitle() {
+		val canvas = subSurface.lockHardwareCanvas()
+		canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+		subSurface.unlockCanvasAndPost(canvas)
 	}
 
 	private fun seekEnd() {
@@ -327,7 +245,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 		val bufferPos = exoPlayer.bufferedPosition
 		if (bufferPos != bufferPosition && bufferPos > exoPlayer.currentPosition) {
 			bufferPosition = bufferPos
-			sendEvent(mapOf(
+			eventSink?.success(mapOf(
 				"event" to "buffer",
 				"begin" to exoPlayer.currentPosition,
 				"end" to bufferPosition
@@ -351,31 +269,10 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 		val pos = exoPlayer.currentPosition
 		if (pos != position) {
 			position = pos
-			sendEvent(mapOf(
+			eventSink?.success(mapOf(
 				"event" to "position",
 				"value" to pos
 			))
-		}
-	}
-
-	private fun sendEvent(event: Map<String, Any?>) {
-		if (Looper.myLooper() == exoPlayer.applicationLooper) {
-			eventSink?.success(event)
-		} else {
-			handler.post {
-				sendEvent(event)
-			}
-		}
-	}
-
-	private fun render (videoFrame: Bitmap) {
-		val canvas = surfaceProducer.surface.lockHardwareCanvas()
-		if (canvas != null) {
-			canvas.drawBitmap(videoFrame, 0f, 0f, null)
-			if (showSubtitle) {
-				canvas.drawBitmap(subTitleFrame, 0f, 0f, paint)
-			}
-			surfaceProducer.surface.unlockCanvasAndPost(canvas)
 		}
 	}
 
@@ -383,7 +280,7 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 		super.onPlayerError(error)
 		if (state > 0U) {
 			close()
-			sendEvent(mapOf(
+			eventSink?.success(mapOf(
 				"event" to "error",
 				"value" to error.errorCodeName
 			))
@@ -428,21 +325,21 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 						}
 					}
 				}
-				sendEvent(mapOf(
+				eventSink?.success(mapOf(
 					"event" to "mediaInfo",
 					"duration" to if (exoPlayer.isCurrentMediaItemLive) 0 else exoPlayer.duration,
 					"tracks" to allTracks,
 					"source" to source
 				))
 			} else if (state > 2U) {
-				sendEvent(mapOf(
+				eventSink?.success(mapOf(
 					"event" to "loading",
 					"value" to false
 				))
 			}
 		} else if (playbackState == Player.STATE_ENDED) {
 			if (state > 1U && !exoPlayer.isCurrentMediaItemLive) {
-				sendEvent(mapOf(
+				eventSink?.success(mapOf(
 					"event" to "position",
 					"value" to exoPlayer.duration
 				))
@@ -455,11 +352,11 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 				} else {
 					state = 2U
 				}
-				sendEvent(mapOf("event" to "finished"))
+				eventSink?.success(mapOf("event" to "finished"))
 			}
 		} else if (playbackState == Player.STATE_BUFFERING) {
 			if (state > 2U) {
-				sendEvent(mapOf(
+				eventSink?.success(mapOf(
 					"event" to "loading",
 					"value" to true
 				))
@@ -481,49 +378,38 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 		}
 	}
 
+	override fun onVideoSizeChanged(videoSize: VideoSize) {
+		super.onVideoSizeChanged(videoSize)
+		if (state > 0U) {
+			val width: Int
+			val height: Int
+			if (videoSize.unappliedRotationDegrees % 180 == 0) {
+				width = (videoSize.width * videoSize.pixelWidthHeightRatio).roundToInt()
+				height = videoSize.height
+			} else {
+				width = videoSize.height
+				height = (videoSize.width * videoSize.pixelWidthHeightRatio).roundToInt()
+			}
+			if (width > 0 && height > 0) {
+				subSurfaceTexture.setDefaultBufferSize(width, height)
+			}
+			eventSink?.success(mapOf(
+				"event" to "videoSize",
+				"width" to width.toFloat(),
+				"height" to height.toFloat()
+			))
+		}
+	}
+
 	override fun onCues(cueGroup: CueGroup) {
 		super.onCues(cueGroup)
-		if (state > 0U) {
-			val canvas = Canvas(subTitleFrame)
+		if (state > 0U && showSubtitle) {
+			val canvas = subSurface.lockHardwareCanvas()
 			canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
 			for (cue in cueGroup.cues) {
 				subtitlePainter.draw(cue, canvas)
 			}
-		}
-	}
-
-	override fun onVideoFrameAboutToBeRendered(presentationTimeUs: Long, releaseTimeNs: Long, format: Format, mediaFormat: MediaFormat?) {
-		if (state > 0U) {
-			val w: Int
-			val h: Int
-			if (format.rotationDegrees % 180 == 0) {
-				w = (format.width * format.pixelWidthHeightRatio).roundToInt()
-				h = format.height
-			} else {
-				w = format.height
-				h = (format.width * format.pixelWidthHeightRatio).roundToInt()
-			}
-			if (w > 0 && h > 0 && (w != surfaceProducer.width || h != surfaceProducer.height)) {
-				surfaceProducer.setSize(w, h)
-				surfaceTexture?.setDefaultBufferSize(w, h)
-				var old = subTitleFrame
-				subTitleFrame = Bitmap.createScaledBitmap(old, w, h, true)
-				old.recycle()
-				old = videoFrame
-				videoFrame = Bitmap.createScaledBitmap(old, w, h, true)
-				if (!copying.compareAndSet(1, 2)) { // don't recycle if copying
-					old.recycle()
-				}
-			}
-			if (w != width || h != height) {
-				width = w
-				height = h
-				sendEvent(mapOf(
-					"event" to "videoSize",
-					"width" to width.toFloat(),
-					"height" to height.toFloat()
-				))
-			}
+			subSurface.unlockCanvasAndPost(canvas)
 		}
 	}
 
@@ -533,15 +419,6 @@ class AvMediaPlayer(private val binding: FlutterPlugin.FlutterPluginBinding) : E
 
 	override fun onCancel(arguments: Any?) {
 		eventSink = null
-	}
-
-	override fun onSurfaceAvailable() {
-		hidden = false
-		render(videoFrame)
-	}
-
-	override fun onSurfaceDestroyed() {
-		hidden = true
 	}
 }
 
@@ -564,7 +441,8 @@ class AvMediaPlayerPlugin: FlutterPlugin {
 					val player = AvMediaPlayer(binding)
 					players[player.id] = player
 					result.success(mapOf(
-						"id" to player.id
+						"id" to player.id,
+						"subId" to player.subId
 					))
 				}
 				"dispose" -> {

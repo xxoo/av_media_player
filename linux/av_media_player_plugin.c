@@ -51,8 +51,8 @@ typedef struct {
 	FlBinaryMessenger* messenger;
 	FlTextureRegistrar* textureRegistrar;
 	FlMethodChannel* methodChannel;
-	GTree* players;
-	GMutex mutex;
+	GTree* players; // all write operations on the tree are done in the main thread
+	GMutex mutex;   // so we just need to lock the mutex when reading in other threads
 } AvMediaPlayerPlugin;
 typedef struct {
 	GObjectClass parent_class;
@@ -279,7 +279,7 @@ static void* gl_init(void* data, const char* name) {
 	}
 }
 
-static void event_callback(void* id) {
+static gboolean event_callback(void* id) {
 	AvMediaPlayer* self = g_tree_lookup(plugin->players, id);
 	while (self) {
 		mpv_event* event = mpv_wait_event(self->mpv, 0);
@@ -461,13 +461,16 @@ static void event_callback(void* id) {
 			}
 		}
 	}
+	return FALSE;
 }
 
 static void wakeup_callback(void* id) {
-	g_idle_add_once(event_callback, id);
+	// make sure event_callback is called in the main thread
+	g_idle_add(event_callback, id);
 }
 
 static void texture_update_callback(void* id) {
+	// this function is not called in the main thread
 	g_mutex_lock(&plugin->mutex);
 	AvMediaPlayer* self = g_tree_lookup(plugin->players, id);
 	g_mutex_unlock(&plugin->mutex);

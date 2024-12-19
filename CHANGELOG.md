@@ -1,6 +1,10 @@
+## 1.1.5 & 1.2.1
+- fixed support for GlibC prior to 2.74 on linux.
+- fixed support for building with VS2019 on windows.
+
 ## 1.2.0
 - support Impeller renderer on android.
-- requires flutter 3.27.0 or higher.
+- require flutter 3.27.0 or higher. use 1.1.x for older flutter versions.
 
 ## 1.1.4
 - fixed a bug on ios/macos that can lead to crash while setting the volume and speed.

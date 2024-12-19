@@ -80,7 +80,7 @@ class TrackInfo {
 }
 
 /// This type is used by [AvMediaPlayer] to show current media info.
-/// [duration] == 0 means the media is a realtime stream.
+/// [duration] == 0 means the media is realtime stream.
 /// [tracks] contains all the tracks of the media. The key is the track id. However, video tracks may not available on ios/macos/windows.
 class MediaInfo {
   final int duration;
