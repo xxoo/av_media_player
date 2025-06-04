@@ -1,4 +1,7 @@
-## 1.1.5 & 1.2.1
+## 1.2.2 & 1.1.6
+- fixed buffering issue on linux.
+
+## 1.2.1 & 1.1.5
 - fixed support for GlibC prior to 2.74 on linux.
 - fixed support for building with VS2019 on windows.
 
@@ -10,15 +13,15 @@
 - fixed a bug on ios/macos that can lead to crash while setting the volume and speed.
 
 ## 1.1.3
-- restore example project
+- restore example project.
 
 ## 1.1.2
-- minor fixes and optimizations
-- support swift package manager on ios/macos
+- minor fixes and optimizations.
+- support swift package manager on ios/macos.
 
 ## 1.1.1
-- fix broken windows build
-- fix flutter min version
+- fix broken windows build.
+- fix flutter min version.
 
 ## 1.1.0
 - support subtitles on all platforms.
@@ -63,7 +66,7 @@
 - minor fixes on windows.
 
 ## 0.6.8
-- add Windows support.
+- add windows support.
 - **breaking change:** rename `AVMediaPlayer` class to `AvMediaPlayer`.
 - **breaking change:** rename `AVMediaView` class to `AvMediaView`.
 
@@ -105,25 +108,25 @@
 - **breaking change:** remove `keepAspectRatio` property from `AVMediaView` widget and add `sizingMode` property instead.
 
 ## 0.5.6
-- fix setState issue in `AVMediaView` widget
+- fix setState issue in `AVMediaView` widget.
 
 ## 0.5.5
-- improve vsync handling on ios/macos
-- improve dartdoc comments
+- improve vsync handling on ios/macos.
+- improve dartdoc comments.
 
 ## 0.5.4
-- improve vsync handling on macos
-- fixed a resource leak issue on ios/macos
+- improve vsync handling on macos.
+- fixed a resource leak issue on ios/macos.
 
 ## 0.5.3
-- improve dartdoc comments
-- improve examples
-- combine macos and ios backend code
-- add `backgroundColor` and `keepAspectRatio` support for `AVMediaView` widget
+- improve dartdoc comments.
+- improve examples.
+- combine macos and ios backend code.
+- add `backgroundColor` and `keepAspectRatio` support for `AVMediaView` widget.
 
 ## 0.5.2
-- add dartdoc comments
-- change default example to the simple one
+- add dartdoc comments.
+- change default example to the simple one.
 
 ## 0.5.1
 - first public release.

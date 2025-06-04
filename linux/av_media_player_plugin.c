@@ -566,7 +566,7 @@ static void av_media_player_init(AvMediaPlayer* self) {
 	mpv_set_property_string(self->mpv, "keep-open", "yes");
 	mpv_set_property_string(self->mpv, "idle", "yes");
 	//mpv_set_property_string(self->mpv, "sub-create-cc-track", "yes");
-	mpv_set_property_string(self->mpv, "cache", "no");
+	//mpv_set_property_string(self->mpv, "cache", "no");
 	av_media_player_set_show_subtitle(self, false);
 	mpv_initialize(self->mpv);
 	mpv_observe_property(self->mpv, 0, "time-pos/full", MPV_FORMAT_DOUBLE);

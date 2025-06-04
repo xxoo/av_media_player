@@ -1,3 +1,5 @@
+**This package is deprecated and no longer maintained. Please use [video_view](https://pub.dev/packages/video_view) instead.**
+
 ## About
 
 av_media_player is a lightweight media player with subtitle rendering[^subtitle] and track selection support, leveraging system or app-level components for seamless playback, video rendering via `Texture` widget.

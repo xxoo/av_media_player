@@ -1,6 +1,6 @@
 name: av_media_player
 description: "A lightweight media player with subtitle rendering and track selection support, leveraging system or app-level components for seamless playback, video rendering via Texture widget."
-version: 1.2.1
+version: 1.1.6
 repository: "https://github.com/xxoo/av_media_player"
 issue_tracker: "https://github.com/xxoo/av_media_player/issues"
 topics:
